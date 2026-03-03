@@ -38,7 +38,7 @@ Important rules:
 - Return ONLY valid JSON, no additional text
 
 DOCUMENT TEXT:
-{text}"""
+__DOCUMENT_TEXT__"""
 
 MAX_TEXT_LENGTH = 15000  # Limit text sent to Claude to control costs
 
@@ -62,7 +62,7 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
     if len(text) > MAX_TEXT_LENGTH:
         truncated_text += "\n\n[... text truncated ...]"
 
-    prompt = CLASSIFICATION_PROMPT.format(text=truncated_text)
+    prompt = CLASSIFICATION_PROMPT.replace("__DOCUMENT_TEXT__", truncated_text)
 
     try:
         result = _call_claude(prompt)

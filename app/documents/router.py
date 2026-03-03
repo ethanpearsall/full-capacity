@@ -116,7 +116,7 @@ async def _process_single_file(
             "confidence_score": classification.confidence,
             "client_name": classification.client_name,
             "counterparty": classification.counterparty,
-            "document_date": classification.document_date.isoformat() if classification.document_date else None,
+            "document_date": str(classification.document_date) if classification.document_date else None,
             "matter_reference": classification.matter_reference,
             "amount": classification.amount,
             "currency": classification.currency,
