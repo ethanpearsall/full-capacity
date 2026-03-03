@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Full Capacity{% endblock %}
+
+{% block body %}
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-sidebar text-white flex flex-col flex-shrink-0">
+        <div class="p-4 border-b border-gray-700">
+            <h1 class="text-xl font-bold">Full Capacity</h1>
+            <p class="text-gray-400 text-xs mt-1">{{ user.get('organisations', {}).get('name', '') if user.get('organisations') is mapping else '' }}</p>
+        </div>
+
+        <!-- Folder Tree -->
+        <div class="flex-1 overflow-y-auto p-4">
+            <h2 class="text-xs uppercase text-gray-400 font-semibold mb-3 tracking-wider">Folders</h2>
+            <div id="folder-tree" class="folder-tree text-sm">
+                <p class="text-gray-500 text-xs">Loading...</p>
+            </div>
+        </div>
+
+        <!-- User info & logout -->
+        <div class="p-4 border-t border-gray-700">
+            <p class="text-sm text-gray-300 truncate">{{ user.get('email', '') }}</p>
+            <button onclick="logout()" class="text-xs text-gray-400 hover:text-white mt-1">Sign out</button>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Top bar -->
+        <header class="bg-white border-b px-6 py-4 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center flex-1 max-w-xl">
+                <input type="text" id="search-input" placeholder="Search documents..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent">
+                <button onclick="searchDocuments()" class="ml-2 bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors text-sm">
+                    Search
+                </button>
+            </div>
+            <a href="/upload"
+                class="ml-4 bg-accent text-white px-5 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium text-sm">
+                Upload
+            </a>
+        </header>
+
+        <!-- Stats row -->
+        <div id="stats-row" class="px-6 py-4 bg-white border-b flex gap-4 flex-shrink-0">
+            <div class="bg-blue-50 rounded-lg px-4 py-3 flex-1 text-center">
+                <p class="text-2xl font-bold text-accent" id="stat-total">—</p>
+                <p class="text-xs text-gray-500 mt-1">Total Documents</p>
+            </div>
+            <div class="bg-green-50 rounded-lg px-4 py-3 flex-1 text-center">
+                <p class="text-2xl font-bold text-green-600" id="stat-today">—</p>
+                <p class="text-xs text-gray-500 mt-1">Processed Today</p>
+            </div>
+            <div class="bg-purple-50 rounded-lg px-4 py-3 flex-1 text-center">
+                <p class="text-2xl font-bold text-purple-600" id="stat-types">—</p>
+                <p class="text-xs text-gray-500 mt-1">Document Types</p>
+            </div>
+        </div>
+
+        <!-- Document list -->
+        <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="bg-white rounded-lg shadow">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b text-left text-xs uppercase text-gray-500">
+                            <th class="px-4 py-3 font-medium">Name</th>
+                            <th class="px-4 py-3 font-medium">Type</th>
+                            <th class="px-4 py-3 font-medium">Client</th>
+                            <th class="px-4 py-3 font-medium">Date</th>
+                            <th class="px-4 py-3 font-medium">Status</th>
+                            <th class="px-4 py-3 font-medium"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="documents-table">
+                        <tr>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading documents...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadDocuments();
+    loadFolderTree();
+});
+
+document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') searchDocuments();
+});
+
+async function loadStats() {
+    try {
+        const res = await fetch('/api/documents/stats');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('stat-total').textContent = data.total_documents;
+        document.getElementById('stat-today').textContent = data.processed_today;
+        document.getElementById('stat-types').textContent = Object.keys(data.by_type).length;
+    } catch (err) {
+        console.error('Failed to load stats:', err);
+    }
+}
+
+async function loadDocuments(params = '') {
+    try {
+        const res = await fetch('/api/documents' + params);
+        if (!res.ok) return;
+        const data = await res.json();
+        renderDocuments(data.documents);
+    } catch (err) {
+        console.error('Failed to load documents:', err);
+    }
+}
+
+function renderDocuments(docs) {
+    const tbody = document.getElementById('documents-table');
+    if (!docs || docs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No documents found. <a href="/upload" class="text-accent hover:underline">Upload your first document</a></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = docs.map(doc => {
+        const statusColors = {
+            processing: 'bg-yellow-100 text-yellow-800',
+            classified: 'bg-blue-100 text-blue-800',
+            filed: 'bg-green-100 text-green-800',
+            error: 'bg-red-100 text-red-800',
+        };
+        const statusClass = statusColors[doc.status] || 'bg-gray-100 text-gray-800';
+        const docDate = doc.document_date || '—';
+        const docType = doc.document_type ? doc.document_type.replace(/_/g, ' ') : '—';
+
+        return `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="window.location='/document/${doc.id}'">
+            <td class="px-4 py-3 text-sm font-medium text-gray-900">${escapeHtml(doc.filed_name || doc.original_filename)}</td>
+            <td class="px-4 py-3 text-sm text-gray-600 capitalize">${escapeHtml(docType)}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(doc.client_name || '—')}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(docDate)}</td>
+            <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">${doc.status}</span></td>
+            <td class="px-4 py-3 text-right">
+                <a href="/api/documents/${doc.id}/download" class="text-accent hover:underline text-sm" onclick="event.stopPropagation()">Download</a>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function searchDocuments() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) {
+        loadDocuments();
+        return;
+    }
+    try {
+        const res = await fetch('/api/documents/search?q=' + encodeURIComponent(q));
+        if (!res.ok) return;
+        const data = await res.json();
+        renderDocuments(data.documents);
+    } catch (err) {
+        console.error('Search failed:', err);
+    }
+}
+
+async function loadFolderTree() {
+    try {
+        const res = await fetch('/api/folders');
+        if (!res.ok) return;
+        const data = await res.json();
+        const container = document.getElementById('folder-tree');
+        if (!data.tree || Object.keys(data.tree).length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-xs">No folders yet</p>';
+            return;
+        }
+        container.innerHTML = renderTree(data.tree, '');
+    } catch (err) {
+        console.error('Failed to load folder tree:', err);
+    }
+}
+
+function renderTree(node, path) {
+    let html = '';
+    for (const [name, children] of Object.entries(node)) {
+        const fullPath = path + '/' + name;
+        const hasChildren = Object.keys(children).length > 0;
+        html += `<div class="folder-item">
+            <div class="flex items-center py-1 px-2 rounded hover:bg-sidebar-hover cursor-pointer"
+                 onclick="${hasChildren ? 'toggleFolder(this)' : `loadFolderDocs('${fullPath}')`}">
+                <span class="mr-2 text-xs">${hasChildren ? '&#9654;' : '&#9679;'}</span>
+                <span class="truncate">${escapeHtml(name.replace(/_/g, ' '))}</span>
+            </div>
+            ${hasChildren ? `<div class="folder-children pl-4">${renderTree(children, fullPath)}</div>` : ''}
+        </div>`;
+    }
+    return html;
+}
+
+function toggleFolder(el) {
+    const parent = el.parentElement;
+    parent.classList.toggle('folder-open');
+    const arrow = el.querySelector('span');
+    if (parent.classList.contains('folder-open')) {
+        arrow.innerHTML = '&#9660;';
+    } else {
+        arrow.innerHTML = '&#9654;';
+    }
+}
+
+async function loadFolderDocs(path) {
+    try {
+        const res = await fetch('/api/folders' + path);
+        if (!res.ok) return;
+        const data = await res.json();
+        renderDocuments(data.documents);
+    } catch (err) {
+        console.error('Failed to load folder:', err);
+    }
+}
+</script>
+{% endblock %}

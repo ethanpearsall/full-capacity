@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Document — Full Capacity{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Nav bar -->
+    <nav class="bg-sidebar text-white px-6 py-4 flex items-center justify-between">
+        <a href="/dashboard" class="text-xl font-bold hover:text-gray-200">Full Capacity</a>
+        <div class="flex items-center gap-4">
+            <a href="/dashboard" class="text-sm text-gray-300 hover:text-white">Dashboard</a>
+            <a href="/upload" class="text-sm text-gray-300 hover:text-white">Upload</a>
+            <button onclick="logout()" class="text-sm text-gray-400 hover:text-white">Sign out</button>
+        </div>
+    </nav>
+
+    <div class="max-w-5xl mx-auto py-8 px-4">
+        <a href="/dashboard" class="text-accent hover:underline text-sm mb-4 inline-block">&larr; Back to Dashboard</a>
+
+        <div id="doc-loading" class="text-center py-12 text-gray-400">Loading document...</div>
+        <div id="doc-content" class="hidden">
+
+            <!-- Header -->
+            <div class="flex items-start justify-between mb-6">
+                <div>
+                    <h1 id="doc-title" class="text-2xl font-bold text-gray-900"></h1>
+                    <p id="doc-original-name" class="text-sm text-gray-400 mt-1"></p>
+                </div>
+                <div class="flex gap-3">
+                    <a id="download-btn" href="#"
+                        class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                        Download Original
+                    </a>
+                    <button disabled
+                        class="bg-gray-200 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
+                        title="Coming soon">
+                        Reclassify
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status & Classification -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-lg border p-4">
+                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Status</h3>
+                    <span id="doc-status" class="px-3 py-1 rounded-full text-sm font-medium"></span>
+                </div>
+                <div class="bg-white rounded-lg border p-4">
+                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Document Type</h3>
+                    <p id="doc-type" class="text-lg font-medium text-gray-900 capitalize"></p>
+                </div>
+                <div class="bg-white rounded-lg border p-4">
+                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Confidence</h3>
+                    <p id="doc-confidence" class="text-lg font-bold"></p>
+                </div>
+            </div>
+
+            <!-- Metadata cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="bg-white rounded-lg border p-4">
+                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-3">Metadata</h3>
+                    <dl class="space-y-2 text-sm">
+                        <div class="flex justify-between"><dt class="text-gray-500">Client</dt><dd id="doc-client" class="font-medium text-gray-900"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">Counterparty</dt><dd id="doc-counterparty" class="font-medium text-gray-900"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">Document Date</dt><dd id="doc-date" class="font-medium text-gray-900"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">Reference</dt><dd id="doc-reference" class="font-medium text-gray-900"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">Amount</dt><dd id="doc-amount" class="font-medium text-gray-900"></dd></div>
+                    </dl>
+                </div>
+                <div class="bg-white rounded-lg border p-4">
+                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-3">Filing Info</h3>
+                    <dl class="space-y-2 text-sm">
+                        <div class="flex justify-between"><dt class="text-gray-500">Filed Name</dt><dd id="doc-filed-name" class="font-medium text-gray-900 text-right max-w-[250px] truncate"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">Folder Path</dt><dd id="doc-folder" class="font-medium text-gray-900 text-right max-w-[250px] truncate"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">File Size</dt><dd id="doc-size" class="font-medium text-gray-900"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">Uploaded</dt><dd id="doc-uploaded" class="font-medium text-gray-900"></dd></div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="bg-white rounded-lg border p-4 mb-6">
+                <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">AI Summary</h3>
+                <p id="doc-summary" class="text-gray-700"></p>
+            </div>
+
+            <!-- Tags -->
+            <div class="bg-white rounded-lg border p-4 mb-6">
+                <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Tags</h3>
+                <div id="doc-tags" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Extracted text -->
+            <div class="bg-white rounded-lg border p-4">
+                <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Extracted Text</h3>
+                <div id="doc-text" class="max-h-96 overflow-y-auto bg-gray-50 p-4 rounded text-sm text-gray-700 whitespace-pre-wrap font-mono"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const docId = '{{ doc_id }}';
+
+document.addEventListener('DOMContentLoaded', loadDocument);
+
+async function loadDocument() {
+    try {
+        const res = await fetch(`/api/documents/${docId}`);
+        if (!res.ok) {
+            document.getElementById('doc-loading').textContent = 'Document not found.';
+            return;
+        }
+        const doc = await res.json();
+        renderDocument(doc);
+    } catch (err) {
+        document.getElementById('doc-loading').textContent = 'Failed to load document.';
+    }
+}
+
+function renderDocument(doc) {
+    document.getElementById('doc-loading').classList.add('hidden');
+    document.getElementById('doc-content').classList.remove('hidden');
+
+    document.getElementById('doc-title').textContent = doc.filed_name || doc.original_filename;
+    document.getElementById('doc-original-name').textContent = 'Original: ' + doc.original_filename;
+    document.getElementById('download-btn').href = `/api/documents/${doc.id}/download`;
+
+    // Status
+    const statusEl = document.getElementById('doc-status');
+    const statusColors = {
+        processing: 'bg-yellow-100 text-yellow-800',
+        classified: 'bg-blue-100 text-blue-800',
+        filed: 'bg-green-100 text-green-800',
+        error: 'bg-red-100 text-red-800',
+    };
+    statusEl.textContent = doc.status;
+    statusEl.className = `px-3 py-1 rounded-full text-sm font-medium ${statusColors[doc.status] || 'bg-gray-100'}`;
+
+    // Type & confidence
+    document.getElementById('doc-type').textContent = (doc.document_type || '—').replace(/_/g, ' ');
+
+    const confEl = document.getElementById('doc-confidence');
+    const conf = doc.confidence_score;
+    if (conf != null) {
+        const pct = Math.round(conf * 100);
+        confEl.textContent = pct + '%';
+        if (conf >= 0.8) confEl.className = 'text-lg font-bold confidence-high';
+        else if (conf >= 0.5) confEl.className = 'text-lg font-bold confidence-medium';
+        else confEl.className = 'text-lg font-bold confidence-low';
+    } else {
+        confEl.textContent = '—';
+    }
+
+    // Metadata
+    document.getElementById('doc-client').textContent = doc.client_name || '—';
+    document.getElementById('doc-counterparty').textContent = doc.counterparty || '—';
+    document.getElementById('doc-date').textContent = doc.document_date || '—';
+    document.getElementById('doc-reference').textContent = doc.matter_reference || '—';
+    document.getElementById('doc-amount').textContent = doc.amount ? `${doc.currency || 'GBP'} ${Number(doc.amount).toLocaleString()}` : '—';
+
+    // Filing
+    document.getElementById('doc-filed-name').textContent = doc.filed_name || '—';
+    document.getElementById('doc-folder').textContent = doc.folder_path || '—';
+    document.getElementById('doc-size').textContent = doc.file_size_bytes ? formatSize(doc.file_size_bytes) : '—';
+    document.getElementById('doc-uploaded').textContent = doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : '—';
+
+    // Summary
+    document.getElementById('doc-summary').textContent = doc.summary || 'No summary available.';
+
+    // Tags
+    const tagsContainer = document.getElementById('doc-tags');
+    if (doc.tags && doc.tags.length > 0) {
+        tagsContainer.innerHTML = doc.tags.map(t =>
+            `<span class="bg-blue-50 text-accent px-3 py-1 rounded-full text-xs font-medium">${escapeHtml(t)}</span>`
+        ).join('');
+    } else {
+        tagsContainer.innerHTML = '<span class="text-gray-400 text-sm">No tags</span>';
+    }
+
+    // Extracted text
+    document.getElementById('doc-text').textContent = doc.extracted_text || 'No text extracted.';
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Full Capacity{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sidebar: '#1a1a2e',
+                        'sidebar-hover': '#16213e',
+                        accent: '#4a90d9',
+                        'accent-hover': '#357abd',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .folder-tree .folder-children { display: none; }
+        .folder-tree .folder-open > .folder-children { display: block; }
+        .drop-zone.dragover { border-color: #4a90d9; background-color: rgba(74, 144, 217, 0.05); }
+        .confidence-high { color: #16a34a; }
+        .confidence-medium { color: #ca8a04; }
+        .confidence-low { color: #dc2626; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% block body %}{% endblock %}
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

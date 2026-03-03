@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Upload — Full Capacity{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Nav bar -->
+    <nav class="bg-sidebar text-white px-6 py-4 flex items-center justify-between">
+        <a href="/dashboard" class="text-xl font-bold hover:text-gray-200">Full Capacity</a>
+        <div class="flex items-center gap-4">
+            <a href="/dashboard" class="text-sm text-gray-300 hover:text-white">Dashboard</a>
+            <button onclick="logout()" class="text-sm text-gray-400 hover:text-white">Sign out</button>
+        </div>
+    </nav>
+
+    <div class="max-w-3xl mx-auto py-12 px-4">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">Upload Documents</h1>
+        <p class="text-gray-500 mb-8">Drag and drop files or click to browse. Supported formats: PDF, JPG, PNG, DOCX.</p>
+
+        <!-- Drop zone -->
+        <div id="drop-zone"
+            class="drop-zone border-2 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer hover:border-accent transition-colors">
+            <div class="mb-4">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+            </div>
+            <p class="text-gray-600 font-medium">Drop files here or click to browse</p>
+            <p class="text-gray-400 text-sm mt-1">PDF, JPG, PNG, DOCX — up to 50MB per file</p>
+            <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp,.docx,.doc" class="hidden">
+        </div>
+
+        <!-- File list -->
+        <div id="file-list" class="mt-6 space-y-3"></div>
+
+        <!-- Upload button -->
+        <div id="upload-actions" class="mt-6 hidden">
+            <button id="upload-btn" onclick="uploadFiles()"
+                class="bg-accent hover:bg-accent-hover text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                Upload & Process
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div id="upload-results" class="mt-8 hidden">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Processing Results</h2>
+            <div id="results-list" class="space-y-3"></div>
+            <div class="mt-6 flex gap-3">
+                <button onclick="resetUpload()" class="bg-accent hover:bg-accent-hover text-white px-5 py-2 rounded-lg text-sm">
+                    Upload More
+                </button>
+                <a href="/dashboard" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 py-2 rounded-lg text-sm">
+                    Go to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedFiles = [];
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    addFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', () => {
+    addFiles(fileInput.files);
+});
+
+function addFiles(files) {
+    for (const file of files) {
+        selectedFiles.push(file);
+    }
+    renderFileList();
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderFileList();
+}
+
+function renderFileList() {
+    const container = document.getElementById('file-list');
+    const actions = document.getElementById('upload-actions');
+
+    if (selectedFiles.length === 0) {
+        container.innerHTML = '';
+        actions.classList.add('hidden');
+        return;
+    }
+
+    actions.classList.remove('hidden');
+    container.innerHTML = selectedFiles.map((file, i) => `
+        <div class="flex items-center justify-between bg-white p-3 rounded-lg border">
+            <div class="flex items-center">
+                <span class="text-sm font-medium text-gray-700">${escapeHtml(file.name)}</span>
+                <span class="text-xs text-gray-400 ml-2">${formatSize(file.size)}</span>
+            </div>
+            <button onclick="removeFile(${i})" class="text-red-400 hover:text-red-600 text-sm">Remove</button>
+        </div>
+    `).join('');
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function uploadFiles() {
+    if (selectedFiles.length === 0) return;
+
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+
+    const formData = new FormData();
+    for (const file of selectedFiles) {
+        formData.append('files', file);
+    }
+
+    try {
+        const res = await fetch('/api/documents/upload', {
+            method: 'POST',
+            body: formData,
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            alert('Upload failed: ' + (data.detail || 'Unknown error'));
+            btn.disabled = false;
+            btn.textContent = 'Upload & Process';
+            return;
+        }
+
+        showResults(data.results);
+    } catch (err) {
+        alert('Upload failed: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Upload & Process';
+    }
+}
+
+function showResults(results) {
+    document.getElementById('upload-actions').classList.add('hidden');
+    document.getElementById('file-list').innerHTML = '';
+    document.getElementById('upload-results').classList.remove('hidden');
+
+    const container = document.getElementById('results-list');
+    container.innerHTML = results.map(r => {
+        const isError = r.status === 'error';
+        const bg = isError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
+        const icon = isError ? '&#10005;' : '&#10003;';
+        const iconColor = isError ? 'text-red-500' : 'text-green-500';
+
+        return `<div class="p-4 rounded-lg border ${bg}">
+            <div class="flex items-start justify-between">
+                <div>
+                    <span class="${iconColor} mr-2">${icon}</span>
+                    <span class="font-medium text-gray-900">${escapeHtml(r.filename || r.filed_name || '')}</span>
+                </div>
+                ${!isError && r.id ? `<a href="/document/${r.id}" class="text-accent text-sm hover:underline">View</a>` : ''}
+            </div>
+            ${r.document_type ? `<p class="text-sm text-gray-600 mt-1">Type: <span class="capitalize">${r.document_type.replace(/_/g, ' ')}</span> | Client: ${escapeHtml(r.client_name || '—')}</p>` : ''}
+            ${r.folder_path ? `<p class="text-xs text-gray-400 mt-1">Filed to: ${escapeHtml(r.folder_path)}</p>` : ''}
+            ${isError ? `<p class="text-sm text-red-600 mt-1">${escapeHtml(r.error || 'Processing failed')}</p>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function resetUpload() {
+    selectedFiles = [];
+    document.getElementById('upload-results').classList.add('hidden');
+    document.getElementById('file-list').innerHTML = '';
+    document.getElementById('upload-actions').classList.add('hidden');
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = false;
+    btn.textContent = 'Upload & Process';
+}
+</script>
+{% endblock %}

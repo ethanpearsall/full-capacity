@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Sign Up — Full Capacity{% endblock %}
+
+{% block body %}
+<div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-sidebar">Full Capacity</h1>
+            <p class="text-gray-500 mt-2">Create your account</p>
+        </div>
+
+        <div id="signup-error" class="hidden bg-red-50 text-red-700 p-3 rounded mb-4 text-sm"></div>
+        <div id="signup-success" class="hidden bg-green-50 text-green-700 p-3 rounded mb-4 text-sm"></div>
+
+        <form id="signup-form" class="space-y-4">
+            <div>
+                <label for="full_name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input type="text" id="full_name" name="full_name" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    placeholder="John Smith">
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" id="email" name="email" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    placeholder="you@yourfirm.com">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="password" name="password" required minlength="8"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    placeholder="Minimum 8 characters">
+            </div>
+            <div>
+                <label for="org_name" class="block text-sm font-medium text-gray-700 mb-1">Organisation Name</label>
+                <input type="text" id="org_name" name="org_name" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    placeholder="Your Firm LLP">
+            </div>
+            <button type="submit"
+                class="w-full bg-accent hover:bg-accent-hover text-white py-2 px-4 rounded-md font-medium transition-colors">
+                Create Account
+            </button>
+        </form>
+
+        <p class="mt-6 text-center text-sm text-gray-500">
+            Already have an account? <a href="/login" class="text-accent hover:underline">Sign in</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorDiv = document.getElementById('signup-error');
+    const successDiv = document.getElementById('signup-success');
+    errorDiv.classList.add('hidden');
+    successDiv.classList.add('hidden');
+
+    const data = {
+        full_name: document.getElementById('full_name').value,
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        org_name: document.getElementById('org_name').value,
+    };
+
+    try {
+        const res = await fetch('/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+
+        if (res.ok) {
+            successDiv.textContent = 'Account created! Redirecting...';
+            successDiv.classList.remove('hidden');
+            setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+        } else {
+            const err = await res.json();
+            errorDiv.textContent = err.detail || 'Signup failed';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (err) {
+        errorDiv.textContent = 'Network error. Please try again.';
+        errorDiv.classList.remove('hidden');
+    }
+});
+</script>
+{% endblock %}
