@@ -70,6 +70,37 @@ async def _process_single_file(
     file_size = len(file_bytes)
     original_filename = file.filename or "unnamed_file"
 
+    # Duplicate detection: check for same filename + similar size in this org
+    duplicate = _check_duplicate(sb, org_id, original_filename, file_size)
+    if duplicate:
+        doc_id = str(uuid.uuid4())
+        ext = original_filename.rsplit(".", 1)[-1] if "." in original_filename else "pdf"
+        original_storage_path = f"originals/{org_id}/{doc_id}.{ext}"
+        upload_file(original_storage_path, file_bytes, mime_type)
+        sb.table("documents").insert({
+            "id": doc_id,
+            "organisation_id": org_id,
+            "uploaded_by": user_id,
+            "original_filename": original_filename,
+            "file_size_bytes": file_size,
+            "mime_type": mime_type,
+            "original_storage_path": original_storage_path,
+            "status": "duplicate",
+            "duplicate_of": duplicate["id"],
+        }).execute()
+        _log_activity(sb, org_id, user_id, doc_id, "duplicate_detected", {
+            "duplicate_of": duplicate["id"],
+            "original_name": duplicate.get("original_filename"),
+        })
+        dup_date = duplicate.get("uploaded_at", "unknown date")
+        return {
+            "id": doc_id,
+            "filename": original_filename,
+            "status": "duplicate",
+            "duplicate_of": duplicate["id"],
+            "warning": f"This document appears to be a duplicate of {duplicate.get('filed_name') or duplicate.get('original_filename')} uploaded on {dup_date}",
+        }
+
     # Generate a unique storage path for the original
     doc_id = str(uuid.uuid4())
     ext = original_filename.rsplit(".", 1)[-1] if "." in original_filename else "pdf"
@@ -328,6 +359,96 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
             "Content-Disposition": f'attachment; filename="{result.data["original_filename"]}"'
         },
     )
+
+
+def _check_duplicate(sb, org_id: str, original_filename: str, file_size: int) -> Optional[dict]:
+    """Check if a document with the same filename and similar size already exists."""
+    try:
+        size_min = int(file_size * 0.95)
+        size_max = int(file_size * 1.05)
+
+        result = (
+            sb.table("documents")
+            .select("id, original_filename, filed_name, uploaded_at, file_size_bytes")
+            .eq("organisation_id", org_id)
+            .eq("original_filename", original_filename)
+            .gte("file_size_bytes", size_min)
+            .lte("file_size_bytes", size_max)
+            .neq("status", "duplicate")
+            .limit(1)
+            .execute()
+        )
+
+        if result.data:
+            return result.data[0]
+    except Exception:
+        logger.exception("Duplicate check failed")
+    return None
+
+
+@router.post("/{doc_id}/force-file")
+async def force_file_duplicate(doc_id: str, user: dict = Depends(get_current_user)):
+    """Force-file a document that was flagged as duplicate."""
+    sb = get_supabase_admin()
+    org_id = user["organisation_id"]
+    org_name = user.get("organisations", {}).get("name", "Default") if isinstance(user.get("organisations"), dict) else "Default"
+
+    result = (
+        sb.table("documents")
+        .select("*")
+        .eq("id", doc_id)
+        .eq("organisation_id", org_id)
+        .eq("status", "duplicate")
+        .single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found or not a duplicate")
+
+    doc = result.data
+    original_storage_path = doc["original_storage_path"]
+    file_bytes = download_file(original_storage_path)
+    mime_type = doc["mime_type"]
+
+    # Extract text
+    extracted_text = extract_text(file_bytes, mime_type)
+    sb.table("documents").update({"extracted_text": extracted_text}).eq("id", doc_id).execute()
+
+    # Classify
+    classification = classify_document(extracted_text, doc["original_filename"])
+    update_data = {
+        "document_type": classification.document_type,
+        "confidence_score": classification.confidence,
+        "client_name": classification.client_name,
+        "counterparty": classification.counterparty,
+        "document_date": str(classification.document_date) if classification.document_date else None,
+        "matter_reference": classification.matter_reference,
+        "amount": classification.amount,
+        "currency": classification.currency,
+        "summary": classification.summary,
+        "tags": classification.tags,
+        "status": "classified",
+        "duplicate_of": None,
+        "processed_at": datetime.utcnow().isoformat(),
+    }
+    sb.table("documents").update(update_data).eq("id", doc_id).execute()
+
+    # File
+    folder_path, filed_name = generate_filed_path(classification, org_name, doc["original_filename"])
+    filed_storage_path = f"filed{folder_path}/{filed_name}"
+    move_file(original_storage_path, filed_storage_path)
+
+    sb.table("documents").update({
+        "filed_storage_path": filed_storage_path,
+        "filed_name": filed_name,
+        "folder_path": folder_path,
+        "status": "filed",
+        "filed_at": datetime.utcnow().isoformat(),
+    }).eq("id", doc_id).execute()
+
+    _log_activity(sb, org_id, user["id"], doc_id, "force_filed", {"folder_path": folder_path})
+    return {"id": doc_id, "status": "filed", "folder_path": folder_path, "filed_name": filed_name}
 
 
 def _log_activity(

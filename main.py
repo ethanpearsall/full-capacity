@@ -7,6 +7,7 @@ from app.auth.router import router as auth_router
 from app.auth.dependencies import get_current_user
 from app.documents.router import router as documents_router
 from app.dashboard.router import router as dashboard_router
+from app.chat.router import router as chat_router
 from app.database import get_supabase_admin
 
 logging.basicConfig(
@@ -24,6 +25,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)
 app.include_router(documents_router)
 app.include_router(dashboard_router)
+app.include_router(chat_router)
 
 
 @app.get("/health")

@@ -49,6 +49,7 @@ class DocumentResponse(BaseModel):
     uploaded_at: Optional[str] = None
     processed_at: Optional[str] = None
     filed_at: Optional[str] = None
+    duplicate_of: Optional[str] = None
 
 
 class DocumentStats(BaseModel):

@@ -10,44 +10,65 @@ from app.documents.models import ClassificationResult
 
 logger = logging.getLogger(__name__)
 
-CLASSIFICATION_PROMPT = """You are a document classification and metadata extraction system for professional services firms (law firms, accountancies, bookkeepers, tax consultants).
+CLASSIFICATION_PROMPT = """You are an expert document analyst for UK professional services firms (law firms, accountancies, bookkeepers, tax consultants, quantity surveyors).
 
-Analyse the following document text and return a JSON response with:
+Your job is to classify this document AND extract every possible metadata field. Be thorough — clients pay for accuracy.
+
+Analyse the document text below and return ONLY a JSON object (no other text, no markdown) with these fields:
 
 {
-    "document_type": "one of: invoice, contract, letter, tax_return, receipt, bank_statement, filing, correspondence, report, annual_accounts, payslip, hmrc_notice, court_document, deed, lease, will, company_filing, vat_return, management_accounts, engagement_letter, other",
+    "document_type": "invoice|contract|letter|tax_return|receipt|bank_statement|filing|correspondence|report|annual_accounts|payslip|hmrc_notice|court_document|deed|lease|will|company_filing|vat_return|management_accounts|engagement_letter|other",
     "confidence": 0.0-1.0,
-    "client_name": "the person or company this document relates to (the client of the firm)",
-    "counterparty": "the other party involved if applicable (e.g., HMRC, opposing solicitor, supplier)",
-    "document_date": "YYYY-MM-DD format, the date ON the document (not today)",
-    "matter_reference": "any case number, matter reference, job number, file reference found",
-    "amount": null or numeric value if financial document,
-    "currency": "GBP/USD/EUR",
-    "summary": "2-3 sentence plain English summary of what this document is",
-    "tags": ["tag1", "tag2", "tag3"],
-    "suggested_filename": "ClientName_DocType_YYYY-MM-DD_Reference.pdf"
+    "client_name": "REQUIRED — the person or company this document is about. Look for: the addressee, the 'RE:' line, the account holder, the billable party, the subject of the document. For employment contracts, this is the EMPLOYER. For invoices, this is who is being BILLED. For HMRC notices, this is the COMPANY named. Never return null if there is any name in the document.",
+    "counterparty": "The other party — for invoices: the firm issuing it. For contracts: the other signatory. For HMRC letters: HMRC. For court docs: opposing party.",
+    "document_date": "YYYY-MM-DD — look for: 'Date:', 'Dated:', 'Invoice Date:', 'Date of Agreement:', letter date at top. Use the document's own date, NOT today. If multiple dates, use the primary/header date.",
+    "matter_reference": "Look for ANY of: 'Ref:', 'Our Ref:', 'Your Ref:', 'Reference:', 'Matter:', 'Case No:', 'File:', 'Job No:', 'Invoice No:', 'Claim No:', 'UTR:', 'Account No:'. Extract ALL references found, separated by comma.",
+    "amount": "numeric value only (no currency symbol). For invoices: the TOTAL amount. For contracts: salary or contract value. For tax: tax amount due. null if not financial.",
+    "currency": "GBP|USD|EUR — infer from currency signs or context. Default GBP for UK documents.",
+    "summary": "2-3 sentences. Be specific — include names, amounts, dates, and what action the document requires.",
+    "tags": ["at least 3 relevant tags for searching"],
+    "suggested_filename": "ClientName_DocType_YYYY-MM-DD_Reference.ext — use the actual client name and reference you extracted"
 }
 
-Important rules:
-- If you can't determine a field, set it to null
-- For client_name, look for the addressee, the "RE:" line, the account holder, or the subject
-- For dates, look for document date, invoice date, letter date — NOT any random date in the body
-- For matter_reference, look for patterns like "Ref:", "Our Ref:", "Your Ref:", "Matter:", "Case No:", "File:"
-- Be conservative with confidence — only go above 0.9 if you're very certain
-- Tags should be useful for searching later
-- Return ONLY valid JSON, no additional text
+CRITICAL RULES:
+1. NEVER return null for client_name if ANY person or company name appears in the document
+2. NEVER return null for document_date if ANY date appears in the document header/metadata
+3. NEVER return null for matter_reference if ANY reference number pattern appears
+4. For the summary, always mention specific names, amounts, and dates — not generic descriptions
+5. Return ONLY the JSON object. No explanation. No markdown code blocks. Just the raw JSON.
 
 DOCUMENT TEXT:
-__DOCUMENT_TEXT__"""
+"""
+
+EXTRACTION_PROMPT = """The following document was classified as {document_type} but metadata extraction was incomplete.
+
+Please re-examine the text carefully and extract ONLY these fields as a JSON object (no other text, no markdown):
+
+{{
+    "client_name": "the main person or company this document is about",
+    "counterparty": "the other party involved",
+    "document_date": "YYYY-MM-DD",
+    "matter_reference": "any reference numbers found",
+    "amount": null,
+    "currency": "GBP"
+}}
+
+Look VERY carefully at the document header, addressee lines, RE: lines, and any reference numbers.
+
+DOCUMENT TEXT:
+{text}"""
 
 MAX_TEXT_LENGTH = 15000  # Limit text sent to Claude to control costs
+
+MODEL = "claude-3-5-sonnet-20241022"
 
 
 def classify_document(text: str, original_filename: str = "") -> ClassificationResult:
     """
     Classify a document using Claude AI and extract metadata.
 
-    Returns a ClassificationResult with document type, metadata, and suggested filename.
+    Uses a two-pass approach: first classifies and extracts metadata,
+    then does a focused extraction pass if confidence is low or client_name is missing.
     """
     if not text or not text.strip():
         logger.warning("Empty text provided for classification")
@@ -62,42 +83,91 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
     if len(text) > MAX_TEXT_LENGTH:
         truncated_text += "\n\n[... text truncated ...]"
 
-    prompt = CLASSIFICATION_PROMPT.replace("__DOCUMENT_TEXT__", truncated_text)
+    prompt = CLASSIFICATION_PROMPT + truncated_text
 
+    # First pass: full classification
+    result = None
     try:
         result = _call_claude(prompt)
         if result:
-            return result
-        logger.warning("First classification attempt returned None (JSON parse failure)")
+            logger.info(
+                "First pass: type=%s confidence=%.2f client=%s",
+                result.document_type,
+                result.confidence,
+                result.client_name,
+            )
     except Exception:
         logger.exception("First classification attempt failed")
 
-    # Retry once on failure
-    try:
-        logger.info("Retrying classification...")
-        result = _call_claude(prompt)
-        if result:
-            return result
-        logger.warning("Second classification attempt returned None (JSON parse failure)")
-    except Exception:
-        logger.exception("Second classification attempt failed")
+    if result is None:
+        # Retry once on failure
+        try:
+            logger.info("Retrying classification...")
+            result = _call_claude(prompt)
+        except Exception:
+            logger.exception("Second classification attempt failed")
 
-    # Fallback — return basic classification
-    logger.warning("All classification attempts failed, returning fallback result")
-    return ClassificationResult(
-        document_type="other",
-        confidence=0.1,
-        summary="Automatic classification was unable to process this document.",
+    if result is None:
+        logger.warning("All classification attempts failed, returning fallback result")
+        return ClassificationResult(
+            document_type="other",
+            confidence=0.1,
+            summary="Automatic classification was unable to process this document.",
+        )
+
+    # Second pass: focused extraction if metadata is incomplete
+    needs_second_pass = (
+        result.confidence < 0.7
+        or (result.client_name is None and len(text.strip()) > 200)
     )
+
+    if needs_second_pass:
+        logger.info("Running second-pass extraction (confidence=%.2f, client=%s)", result.confidence, result.client_name)
+        try:
+            extraction = _run_extraction_pass(result.document_type, truncated_text)
+            if extraction:
+                result = _merge_extraction(result, extraction)
+                logger.info("Second pass merged: client=%s, date=%s, ref=%s", result.client_name, result.document_date, result.matter_reference)
+        except Exception:
+            logger.exception("Second-pass extraction failed")
+
+    return result
+
+
+def _run_extraction_pass(document_type: str, text: str) -> Optional[dict]:
+    """Run a focused extraction pass to fill in missing metadata."""
+    prompt = EXTRACTION_PROMPT.format(document_type=document_type, text=text)
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+    logger.info("Calling Claude API for extraction pass with model %s", MODEL)
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    response_text = message.content[0].text
+    return _parse_json_response(response_text)
+
+
+def _merge_extraction(result: ClassificationResult, extraction: dict) -> ClassificationResult:
+    """Merge second-pass extraction into the classification result, filling nulls."""
+    data = result.model_dump()
+
+    for field in ("client_name", "counterparty", "document_date", "matter_reference", "amount", "currency"):
+        if data.get(field) is None and extraction.get(field) is not None:
+            data[field] = extraction[field]
+
+    return _build_result(data)
 
 
 def _call_claude(prompt: str) -> Optional[ClassificationResult]:
     """Make API call to Claude and parse the response."""
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    logger.info("Calling Claude API with model claude-3-haiku-20240307")
+    logger.info("Calling Claude API with model %s", MODEL)
     message = client.messages.create(
-        model="claude-3-haiku-20240307",
+        model=MODEL,
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -115,9 +185,10 @@ def _call_claude(prompt: str) -> Optional[ClassificationResult]:
 
 def _parse_json_response(response_text: str) -> Optional[dict]:
     """Parse JSON from Claude response, handling markdown code blocks."""
-    # Try direct JSON parse first
+    # Try stripping whitespace first
+    cleaned = response_text.strip()
     try:
-        return json.loads(response_text)
+        return json.loads(cleaned)
     except json.JSONDecodeError:
         pass
 
@@ -129,14 +200,14 @@ def _parse_json_response(response_text: str) -> Optional[dict]:
     ]
 
     for pattern in patterns:
-        match = re.search(pattern, response_text, re.DOTALL)
+        match = re.search(pattern, cleaned, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1) if match.lastindex else match.group(0))
             except json.JSONDecodeError:
                 continue
 
-    logger.error("Could not parse JSON from response: %s", response_text[:500])
+    logger.error("Could not parse JSON from response: %s", cleaned[:500])
     return None
 
 

@@ -13,6 +13,8 @@ class Settings:
     APP_ENV: str = os.getenv("APP_ENV", "development")
     APP_URL: str = os.getenv("APP_URL", "http://localhost:8000")
     STORAGE_BUCKET: str = os.getenv("STORAGE_BUCKET", "documents")
+    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_WEBHOOK_SECRET: str = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
 
 
 settings = Settings()
