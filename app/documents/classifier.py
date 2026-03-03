@@ -95,9 +95,9 @@ def _call_claude(prompt: str) -> Optional[ClassificationResult]:
     """Make API call to Claude and parse the response."""
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    logger.info("Calling Claude API with model claude-3-5-haiku-latest")
+    logger.info("Calling Claude API with model claude-3-haiku-20240307")
     message = client.messages.create(
-        model="claude-3-5-haiku-latest",
+        model="claude-3-haiku-20240307",
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
