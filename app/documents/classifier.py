@@ -68,8 +68,9 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
         result = _call_claude(prompt)
         if result:
             return result
-    except Exception as e:
-        logger.error("First classification attempt failed: %s", str(e))
+        logger.warning("First classification attempt returned None (JSON parse failure)")
+    except Exception:
+        logger.exception("First classification attempt failed")
 
     # Retry once on failure
     try:
@@ -77,11 +78,12 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
         result = _call_claude(prompt)
         if result:
             return result
-    except Exception as e:
-        logger.error("Second classification attempt failed: %s", str(e))
+        logger.warning("Second classification attempt returned None (JSON parse failure)")
+    except Exception:
+        logger.exception("Second classification attempt failed")
 
     # Fallback — return basic classification
-    logger.warning("Classification failed, returning fallback result")
+    logger.warning("All classification attempts failed, returning fallback result")
     return ClassificationResult(
         document_type="other",
         confidence=0.1,
@@ -93,16 +95,19 @@ def _call_claude(prompt: str) -> Optional[ClassificationResult]:
     """Make API call to Claude and parse the response."""
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
+    logger.info("Calling Claude API with model claude-3-5-haiku-latest")
     message = client.messages.create(
-        model="claude-3-5-haiku-20241022",
+        model="claude-3-5-haiku-latest",
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
 
     response_text = message.content[0].text
+    logger.info("Claude API response received (%d chars)", len(response_text))
     parsed = _parse_json_response(response_text)
 
     if parsed is None:
+        logger.error("Failed to parse JSON from Claude response: %.500s", response_text)
         return None
 
     return _build_result(parsed)
@@ -151,8 +156,8 @@ def _build_result(data: dict) -> ClassificationResult:
             tags=data.get("tags", []),
             suggested_filename=data.get("suggested_filename"),
         )
-    except Exception as e:
-        logger.error("Error building ClassificationResult: %s", str(e))
+    except Exception:
+        logger.exception("Error building ClassificationResult from data: %s", data)
         return ClassificationResult(
             document_type=data.get("document_type", "other"),
             confidence=float(data.get("confidence", 0.3)),
