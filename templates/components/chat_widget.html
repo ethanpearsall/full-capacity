@@ -1,0 +1,221 @@
+<!-- Chat Widget -->
+<style>
+    #chat-panel {
+        width: 24rem;
+        height: 500px;
+        transition: width 0.3s ease, height 0.3s ease;
+    }
+    #chat-panel.expanded {
+        width: 60vw;
+        height: 80vh;
+    }
+    #chat-messages .chat-msg-ai,
+    #chat-messages .chat-msg-user {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    #chat-panel .chat-doc-link {
+        color: #737373;
+        text-decoration: underline;
+        text-decoration-color: #a3a3a3;
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    #chat-panel .chat-doc-link:hover {
+        color: #0a0a0a;
+        text-decoration-color: #0a0a0a;
+    }
+    #chat-panel .chat-ref-section {
+        border-top: 1px solid #e5e5e5;
+        margin-top: 0.75rem;
+        padding-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #737373;
+        overflow: hidden;
+    }
+</style>
+<div id="chat-widget" class="fixed bottom-5 right-5 z-50">
+    <!-- Chat Toggle Button -->
+    <button id="chat-toggle" onclick="toggleChat()"
+        class="w-14 h-14 bg-neutral-950 hover:bg-neutral-800 text-white rounded-full shadow-lg flex items-center justify-center transition-all">
+        <svg id="chat-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        <svg id="chat-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="chat-panel" class="hidden absolute bottom-16 right-0 bg-white rounded-xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <div class="bg-black text-white px-4 py-3 rounded-t-xl flex items-center justify-between flex-shrink-0">
+            <div>
+                <h3 class="font-semibold text-sm">Full Capacity AI</h3>
+                <p class="text-neutral-500 text-xs">Ask about your documents</p>
+            </div>
+            <div class="flex items-center gap-1">
+                <button id="chat-expand-btn" onclick="toggleChatExpand()" class="text-neutral-500 hover:text-white p-1 text-lg transition-colors" title="Expand">&#x2922;</button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div class="flex justify-start">
+                <div class="chat-msg-ai bg-neutral-100 text-neutral-900 rounded-lg px-3 py-2 max-w-[80%] text-sm">
+                    Hello! I can help you search and query your documents. Try asking things like:<br><br>
+                    <span class="text-neutral-500">"What's going on with Thornton?"</span><br>
+                    <span class="text-neutral-500">"Show me the Henderson engagement letter"</span><br>
+                    <span class="text-neutral-500">"What was filed today?"</span><br>
+                    <span class="text-neutral-500">"How much did we bill last month?"</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="border-t border-neutral-200 px-3 py-3 flex gap-2 flex-shrink-0">
+            <input type="text" id="chat-input" placeholder="Ask about your documents..."
+                class="flex-1 px-3 py-2 bg-neutral-50 border-none rounded-lg text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 transition-colors"
+                onkeydown="if(event.key==='Enter')sendChatMessage()">
+            <button onclick="sendChatMessage()"
+                class="bg-neutral-950 text-white px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm">
+                Send
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+const CHAT_STORAGE_KEY = 'fullcapacity_chat_messages';
+const CHAT_EXPIRY_MS = 30 * 60 * 1000;
+
+function saveChatMessages() {
+    const messagesDiv = document.getElementById('chat-messages');
+    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    let createdAt;
+    if (stored) {
+        try { createdAt = JSON.parse(stored).created_at; } catch (e) { /* ignore */ }
+    }
+    if (!createdAt) createdAt = Date.now();
+    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
+        messages: messagesDiv.innerHTML,
+        created_at: createdAt,
+    }));
+}
+
+function restoreChatMessages() {
+    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    if (!stored) return;
+    try {
+        const data = JSON.parse(stored);
+        if (Date.now() - data.created_at > CHAT_EXPIRY_MS) {
+            sessionStorage.removeItem(CHAT_STORAGE_KEY);
+            return;
+        }
+        if (data.messages) {
+            document.getElementById('chat-messages').innerHTML = data.messages;
+        }
+    } catch (e) {
+        sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+}
+
+let chatExpanded = false;
+
+function toggleChat() {
+    const panel = document.getElementById('chat-panel');
+    const iconOpen = document.getElementById('chat-icon-open');
+    const iconClose = document.getElementById('chat-icon-close');
+    const isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    iconOpen.classList.toggle('hidden', isHidden);
+    iconClose.classList.toggle('hidden', !isHidden);
+    if (isHidden) {
+        document.getElementById('chat-input').focus();
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+}
+
+function toggleChatExpand() {
+    const panel = document.getElementById('chat-panel');
+    const btn = document.getElementById('chat-expand-btn');
+    chatExpanded = !chatExpanded;
+    panel.classList.toggle('expanded', chatExpanded);
+    btn.innerHTML = chatExpanded ? '&#x2921;' : '&#x2922;';
+    btn.title = chatExpanded ? 'Collapse' : 'Expand';
+}
+
+function formatChatResponse(raw) {
+    const separator = '\n\n---\n';
+    const sepIdx = raw.indexOf(separator);
+    let conversational, linkSection;
+    if (sepIdx !== -1) {
+        conversational = raw.substring(0, sepIdx);
+        linkSection = raw.substring(sepIdx + separator.length);
+    } else {
+        conversational = raw;
+        linkSection = '';
+    }
+    let html = escapeHtml(conversational).replace(/\n/g, '<br>');
+    if (linkSection) {
+        const lines = linkSection.split('\n');
+        let linksHtml = '<div class="chat-ref-section">';
+        for (const line of lines) {
+            const linkMatch = line.match(/^<a href="(\/document\/[^"]+)"(?: target="_blank")?>(.+?)<\/a>(.*)$/);
+            if (linkMatch) {
+                const href = linkMatch[1];
+                const text = escapeHtml(linkMatch[2]);
+                const suffix = escapeHtml(linkMatch[3]);
+                linksHtml += `<div><a href="${href}" target="_blank" class="chat-doc-link">${text}</a><span>${suffix}</span></div>`;
+            } else {
+                linksHtml += `<div>${escapeHtml(line)}</div>`;
+            }
+        }
+        linksHtml += '</div>';
+        html += linksHtml;
+    }
+    return html;
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const query = input.value.trim();
+    if (!query) return;
+    const messagesDiv = document.getElementById('chat-messages');
+    messagesDiv.innerHTML += `<div class="flex justify-end"><div class="chat-msg-user bg-neutral-950 text-white rounded-lg px-3 py-2 max-w-[80%] text-sm">${escapeHtml(query)}</div></div>`;
+    input.value = '';
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    saveChatMessages();
+    const loadingId = 'loading-' + Date.now();
+    messagesDiv.innerHTML += `<div id="${loadingId}" class="flex justify-start"><div class="bg-neutral-100 rounded-lg px-3 py-2 text-sm text-neutral-400">Thinking...</div></div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    try {
+        const res = await fetch('/api/chat/query', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({query}),
+        });
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        if (!res.ok) {
+            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 border border-red-200 rounded-lg px-3 py-2 max-w-[80%] text-sm">Sorry, something went wrong.</div></div>`;
+        } else {
+            const data = await res.json();
+            const formatted = formatChatResponse(data.response);
+            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="chat-msg-ai bg-neutral-100 text-neutral-900 rounded-lg px-3 py-2 max-w-[80%] text-sm">${formatted}</div></div>`;
+        }
+    } catch (err) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 border border-red-200 rounded-lg px-3 py-2 max-w-[80%] text-sm">Connection error. Please try again.</div></div>`;
+    }
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    saveChatMessages();
+}
+
+document.addEventListener('DOMContentLoaded', restoreChatMessages);
+</script>

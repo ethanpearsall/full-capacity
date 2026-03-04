@@ -2,104 +2,96 @@
 {% block title %}Upload — Full Capacity{% endblock %}
 
 {% block body %}
-<div class="min-h-screen bg-gray-50">
-    <!-- Nav bar -->
-    <nav class="bg-sidebar text-white px-6 py-4 flex items-center justify-between">
-        <a href="/dashboard" class="text-xl font-bold hover:text-gray-200">Full Capacity</a>
-        <div class="flex items-center gap-4">
-            <a href="/dashboard" class="text-sm text-gray-300 hover:text-white">Dashboard</a>
-            <button onclick="logout()" class="text-sm text-gray-400 hover:text-white">Sign out</button>
-        </div>
-    </nav>
+<div class="flex h-screen overflow-hidden">
+    {% include 'components/sidebar.html' %}
 
-    <div class="max-w-3xl mx-auto py-12 px-4">
-        <h1 class="text-2xl font-bold text-gray-900 mb-2">Upload Documents</h1>
-        <p class="text-gray-500 mb-8">Drag and drop files or click to browse. Supported formats: PDF, JPG, PNG, DOCX.</p>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        {% include 'components/topbar.html' %}
 
-        <!-- Drop zone -->
-        <div id="drop-zone"
-            class="drop-zone border-2 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer hover:border-accent transition-colors">
-            <div class="mb-4">
-                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                </svg>
+        <main class="flex-1 overflow-y-auto p-6 fade-in">
+            <div class="max-w-2xl mx-auto">
+                <h1 class="text-2xl font-semibold text-neutral-950 tracking-tight mb-1">Upload Documents</h1>
+                <p class="text-sm text-neutral-500 mb-8">Drag and drop files or click to browse. Supported: PDF, JPG, PNG, DOCX.</p>
+
+                <!-- Drop zone -->
+                <div id="drop-zone"
+                    class="drop-zone border-2 border-dashed border-neutral-300 rounded-xl p-12 text-center cursor-pointer hover:border-neutral-500 transition-colors">
+                    <div class="mb-4">
+                        <i data-lucide="upload-cloud" class="w-12 h-12 text-neutral-400 mx-auto"></i>
+                    </div>
+                    <p class="text-neutral-700 font-medium">Drop files here or click to browse</p>
+                    <p class="text-neutral-400 text-sm mt-1">PDF, JPG, PNG, DOCX -- up to 50MB per file</p>
+                    <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp,.docx,.doc" class="hidden">
+                </div>
+
+                <!-- File list -->
+                <div id="file-list" class="mt-6 space-y-2"></div>
+
+                <!-- Upload button -->
+                <div id="upload-actions" class="mt-6 hidden">
+                    <button id="upload-btn" onclick="uploadFiles()"
+                        class="bg-neutral-950 hover:bg-neutral-800 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                        Upload & Process
+                    </button>
+                </div>
+
+                <!-- Results -->
+                <div id="upload-results" class="mt-8 hidden">
+                    <h2 class="text-lg font-semibold text-neutral-950 mb-4">Processing Results</h2>
+                    <div id="results-list" class="space-y-3"></div>
+                    <div class="mt-6 flex gap-3">
+                        <button onclick="resetUpload()" class="bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                            Upload More
+                        </button>
+                        <a href="/dashboard" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                            Go to Dashboard
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Duplicate resolution modal -->
+                <div id="duplicate-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+                    <div class="absolute inset-0 bg-black/60" onclick="closeDuplicateModal()"></div>
+                    <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+                        <h3 id="dup-modal-title" class="text-lg font-semibold text-neutral-950 mb-2"></h3>
+                        <p id="dup-modal-message" class="text-sm text-neutral-600 mb-6"></p>
+                        <div id="dup-modal-actions" class="flex flex-wrap gap-3"></div>
+                    </div>
+                </div>
             </div>
-            <p class="text-gray-600 font-medium">Drop files here or click to browse</p>
-            <p class="text-gray-400 text-sm mt-1">PDF, JPG, PNG, DOCX — up to 50MB per file</p>
-            <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp,.docx,.doc" class="hidden">
-        </div>
-
-        <!-- File list -->
-        <div id="file-list" class="mt-6 space-y-3"></div>
-
-        <!-- Upload button -->
-        <div id="upload-actions" class="mt-6 hidden">
-            <button id="upload-btn" onclick="uploadFiles()"
-                class="bg-accent hover:bg-accent-hover text-white px-6 py-3 rounded-lg font-medium transition-colors">
-                Upload & Process
-            </button>
-        </div>
-
-        <!-- Results -->
-        <div id="upload-results" class="mt-8 hidden">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Processing Results</h2>
-            <div id="results-list" class="space-y-3"></div>
-            <div class="mt-6 flex gap-3">
-                <button onclick="resetUpload()" class="bg-accent hover:bg-accent-hover text-white px-5 py-2 rounded-lg text-sm">
-                    Upload More
-                </button>
-                <a href="/dashboard" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 py-2 rounded-lg text-sm">
-                    Go to Dashboard
-                </a>
-            </div>
-        </div>
-
-        <!-- Duplicate resolution modal -->
-        <div id="duplicate-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
-            <div class="absolute inset-0 bg-black bg-opacity-40" onclick="closeDuplicateModal()"></div>
-            <div class="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
-                <h3 id="dup-modal-title" class="text-lg font-semibold text-gray-900 mb-2"></h3>
-                <p id="dup-modal-message" class="text-sm text-gray-600 mb-6"></p>
-                <div id="dup-modal-actions" class="flex flex-wrap gap-3"></div>
-            </div>
-        </div>
+        </main>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let selectedFiles = [];
+// Set sidebar info
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    setActiveNav('nav-upload');
+    lucide.createIcons();
+});
 
+let selectedFiles = [];
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 
 dropZone.addEventListener('click', () => fileInput.click());
-
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-});
-
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
-});
-
-dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    addFiles(e.dataTransfer.files);
-});
-
-fileInput.addEventListener('change', () => {
-    addFiles(fileInput.files);
-});
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
+dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', () => { addFiles(fileInput.files); });
 
 function addFiles(files) {
-    for (const file of files) {
-        selectedFiles.push(file);
-    }
+    for (const file of files) selectedFiles.push(file);
     renderFileList();
 }
 
@@ -111,23 +103,19 @@ function removeFile(index) {
 function renderFileList() {
     const container = document.getElementById('file-list');
     const actions = document.getElementById('upload-actions');
-
-    if (selectedFiles.length === 0) {
-        container.innerHTML = '';
-        actions.classList.add('hidden');
-        return;
-    }
-
+    if (selectedFiles.length === 0) { container.innerHTML = ''; actions.classList.add('hidden'); return; }
     actions.classList.remove('hidden');
     container.innerHTML = selectedFiles.map((file, i) => `
-        <div class="flex items-center justify-between bg-white p-3 rounded-lg border">
-            <div class="flex items-center">
-                <span class="text-sm font-medium text-gray-700">${escapeHtml(file.name)}</span>
-                <span class="text-xs text-gray-400 ml-2">${formatSize(file.size)}</span>
+        <div class="flex items-center justify-between bg-white border border-neutral-200 p-3 rounded-lg">
+            <div class="flex items-center gap-3">
+                <i data-lucide="file" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-sm font-medium text-neutral-900">${escapeHtml(file.name)}</span>
+                <span class="text-xs text-neutral-400">${formatSize(file.size)}</span>
             </div>
-            <button onclick="removeFile(${i})" class="text-red-400 hover:text-red-600 text-sm">Remove</button>
+            <button onclick="removeFile(${i})" class="text-neutral-400 hover:text-red-600 text-sm transition-colors">Remove</button>
         </div>
     `).join('');
+    lucide.createIcons();
 }
 
 function formatSize(bytes) {
@@ -138,36 +126,17 @@ function formatSize(bytes) {
 
 async function uploadFiles() {
     if (selectedFiles.length === 0) return;
-
     const btn = document.getElementById('upload-btn');
     btn.disabled = true;
     btn.textContent = 'Uploading...';
-
     const formData = new FormData();
-    for (const file of selectedFiles) {
-        formData.append('files', file);
-    }
-
+    for (const file of selectedFiles) formData.append('files', file);
     try {
-        const res = await fetch('/api/documents/upload', {
-            method: 'POST',
-            body: formData,
-        });
-
+        const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
         const data = await res.json();
-        if (!res.ok) {
-            alert('Upload failed: ' + (data.detail || 'Unknown error'));
-            btn.disabled = false;
-            btn.textContent = 'Upload & Process';
-            return;
-        }
-
+        if (!res.ok) { alert('Upload failed: ' + (data.detail || 'Unknown error')); btn.disabled = false; btn.textContent = 'Upload & Process'; return; }
         showResults(data.results);
-    } catch (err) {
-        alert('Upload failed: ' + err.message);
-        btn.disabled = false;
-        btn.textContent = 'Upload & Process';
-    }
+    } catch (err) { alert('Upload failed: ' + err.message); btn.disabled = false; btn.textContent = 'Upload & Process'; }
 }
 
 let pendingDuplicates = [];
@@ -180,46 +149,36 @@ function showResults(results) {
     document.getElementById('upload-actions').classList.add('hidden');
     document.getElementById('file-list').innerHTML = '';
     document.getElementById('upload-results').classList.remove('hidden');
-
-    // Separate duplicates from resolved results
     pendingDuplicates = results.filter(r => isDuplicateStatus(r.status));
     const resolved = results.filter(r => !isDuplicateStatus(r.status));
-
     renderResolvedResults(resolved);
-
-    // Show first duplicate dialog if any
-    if (pendingDuplicates.length > 0) {
-        showDuplicateDialog(pendingDuplicates[0]);
-    }
+    if (pendingDuplicates.length > 0) showDuplicateDialog(pendingDuplicates[0]);
 }
 
 function renderResolvedResults(results) {
     const container = document.getElementById('results-list');
-    if (results.length === 0) {
-        container.innerHTML = '';
-        return;
-    }
+    if (results.length === 0) { container.innerHTML = ''; return; }
     container.innerHTML = results.map(r => {
         const isError = r.status === 'error';
         const isDup = r.status === 'skipped';
-        const bg = isError ? 'bg-red-50 border-red-200' : isDup ? 'bg-gray-50 border-gray-200' : 'bg-green-50 border-green-200';
-        const icon = isError ? '&#10005;' : isDup ? '&#8212;' : '&#10003;';
-        const iconColor = isError ? 'text-red-500' : isDup ? 'text-gray-400' : 'text-green-500';
-
-        return `<div class="p-4 rounded-lg border ${bg}">
+        const bg = isError ? 'bg-red-50 border-red-200' : isDup ? 'bg-neutral-50 border-neutral-200' : 'bg-white border-neutral-200';
+        const iconName = isError ? 'x-circle' : isDup ? 'minus-circle' : 'check-circle';
+        const iconColor = isError ? 'text-red-500' : isDup ? 'text-neutral-400' : 'text-neutral-950';
+        return `<div class="p-4 rounded-xl border ${bg}">
             <div class="flex items-start justify-between">
-                <div>
-                    <span class="${iconColor} mr-2">${icon}</span>
-                    <span class="font-medium text-gray-900">${escapeHtml(r.filename || r.filed_name || '')}</span>
+                <div class="flex items-center gap-2">
+                    <i data-lucide="${iconName}" class="w-4 h-4 ${iconColor}"></i>
+                    <span class="font-medium text-neutral-950 text-sm">${escapeHtml(r.filename || r.filed_name || '')}</span>
                 </div>
-                ${!isError && !isDup && r.id ? `<a href="/document/${r.id}" class="text-accent text-sm hover:underline">View</a>` : ''}
+                ${!isError && !isDup && r.id ? `<a href="/document/${r.id}" class="text-neutral-500 hover:text-neutral-950 text-sm transition-colors">View</a>` : ''}
             </div>
-            ${r.document_type ? `<p class="text-sm text-gray-600 mt-1">Type: <span class="capitalize">${r.document_type.replace(/_/g, ' ')}</span> | Client: ${escapeHtml(r.client_name || '—')}</p>` : ''}
-            ${r.folder_path ? `<p class="text-xs text-gray-400 mt-1">Filed to: ${escapeHtml(r.folder_path)}</p>` : ''}
-            ${isError ? `<p class="text-sm text-red-600 mt-1">${escapeHtml(r.error || 'Processing failed')}</p>` : ''}
-            ${isDup ? `<p class="text-sm text-gray-500 mt-1">Skipped</p>` : ''}
+            ${r.document_type ? `<p class="text-sm text-neutral-500 mt-1 ml-6"><span class="border border-neutral-300 bg-neutral-50 rounded-full px-2 py-0.5 text-xs capitalize">${r.document_type.replace(/_/g, ' ')}</span> <span class="ml-1">${escapeHtml(r.client_name || '')}</span></p>` : ''}
+            ${r.folder_path ? `<p class="text-xs text-neutral-400 mt-1 ml-6">Filed to: ${escapeHtml(r.folder_path)}</p>` : ''}
+            ${isError ? `<p class="text-sm text-red-600 mt-1 ml-6">${escapeHtml(r.error || 'Processing failed')}</p>` : ''}
+            ${isDup ? `<p class="text-sm text-neutral-500 mt-1 ml-6">Skipped</p>` : ''}
         </div>`;
     }).join('');
+    lucide.createIcons();
 }
 
 function showDuplicateDialog(result) {
@@ -236,40 +195,31 @@ function showDuplicateDialog(result) {
         title.textContent = 'Exact Duplicate Found';
         message.innerHTML = `<strong>${filename}</strong> is identical to <strong>${existingName}</strong> uploaded on ${uploadDate}.`;
         actions.innerHTML = `
-            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Skip</button>
-            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium">Upload Anyway</button>
-        `;
+            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Skip</button>
+            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Upload Anyway</button>`;
     } else if (result.status === 'duplicate_name') {
         title.textContent = 'Same Filename, Different Content';
         message.innerHTML = `A file named <strong>${filename}</strong> already exists but this version is different. This may be an updated version.`;
         actions.innerHTML = `
-            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Skip</button>
-            <button onclick="handleDuplicateAction('overwrite', '${result.id}', '${info.existing_id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Overwrite Previous</button>
-            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium">Keep Both</button>
-        `;
+            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Skip</button>
+            <button onclick="handleDuplicateAction('overwrite', '${result.id}', '${info.existing_id}')" class="bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Overwrite</button>
+            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Keep Both</button>`;
     } else if (result.status === 'duplicate_content') {
         title.textContent = 'Same Content, Different Name';
-        message.innerHTML = `This file's content matches <strong>${existingName}</strong> uploaded on ${uploadDate} — just with a different name.`;
+        message.innerHTML = `This file's content matches <strong>${existingName}</strong> uploaded on ${uploadDate} -- just with a different name.`;
         actions.innerHTML = `
-            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Skip</button>
-            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium">Upload Anyway</button>
-        `;
+            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Skip</button>
+            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Upload Anyway</button>`;
     }
-
     modal.classList.remove('hidden');
 }
 
-function closeDuplicateModal() {
-    document.getElementById('duplicate-modal').classList.add('hidden');
-}
+function closeDuplicateModal() { document.getElementById('duplicate-modal').classList.add('hidden'); }
 
 async function handleDuplicateAction(action, docId, existingId) {
     closeDuplicateModal();
-
-    // Find and remove from pending list
     const idx = pendingDuplicates.findIndex(d => d.id === docId);
     let resolvedResult;
-
     try {
         if (action === 'skip') {
             await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
@@ -284,22 +234,12 @@ async function handleDuplicateAction(action, docId, existingId) {
     } catch (err) {
         resolvedResult = { filename: pendingDuplicates[idx]?.filename, status: 'error', error: err.message };
     }
-
-    // Remove from pending and add to resolved results
     if (idx !== -1) pendingDuplicates.splice(idx, 1);
-
-    // Re-render with resolved result added
     const container = document.getElementById('results-list');
     const existingHtml = container.innerHTML;
-    const newResults = [resolvedResult];
-    renderResolvedResults(newResults);
-    const newHtml = container.innerHTML;
-    container.innerHTML = existingHtml + newHtml;
-
-    // Show next duplicate dialog if any remain
-    if (pendingDuplicates.length > 0) {
-        showDuplicateDialog(pendingDuplicates[0]);
-    }
+    renderResolvedResults([resolvedResult]);
+    container.innerHTML = existingHtml + container.innerHTML;
+    if (pendingDuplicates.length > 0) showDuplicateDialog(pendingDuplicates[0]);
 }
 
 function resetUpload() {

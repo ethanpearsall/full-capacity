@@ -3,190 +3,124 @@
 
 {% block body %}
 <div class="flex h-screen overflow-hidden">
-    <!-- Sidebar -->
-    <aside class="w-64 bg-sidebar text-white flex flex-col flex-shrink-0">
-        <div class="p-4 border-b border-gray-700">
-            <h1 class="text-xl font-bold">Full Capacity</h1>
-            <p class="text-gray-400 text-xs mt-1">{{ user.get('organisations', {}).get('name', '') if user.get('organisations') is mapping else '' }}</p>
-        </div>
+    {% include 'components/sidebar.html' %}
 
-        <!-- Folder Tree -->
-        <div class="flex-1 overflow-y-auto p-4">
-            <h2 class="text-xs uppercase text-gray-400 font-semibold mb-3 tracking-wider">Folders</h2>
-            <div id="folder-tree" class="folder-tree text-sm">
-                <p class="text-gray-500 text-xs">Loading...</p>
-            </div>
-        </div>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        {% include 'components/topbar.html' %}
 
-        <!-- User info & logout -->
-        <div class="p-4 border-t border-gray-700">
-            <p class="text-sm text-gray-300 truncate">{{ user.get('email', '') }}</p>
-            <button onclick="logout()" class="text-xs text-gray-400 hover:text-white mt-1">Sign out</button>
-        </div>
-    </aside>
+        <!-- Alert area -->
+        <div id="alert-area" class="px-6 pt-4"></div>
 
-    <!-- Main content -->
-    <main class="flex-1 flex flex-col overflow-hidden">
-        <!-- Top bar -->
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between flex-shrink-0">
-            <div class="flex items-center flex-1 max-w-xl">
-                <input type="text" id="search-input" placeholder="Search documents..."
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent">
-                <button onclick="searchDocuments()" class="ml-2 bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors text-sm">
-                    Search
-                </button>
+        <!-- Main content -->
+        <main class="flex-1 overflow-y-auto p-6 fade-in">
+            <!-- Stats row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
+                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Total Documents</span>
+                    </div>
+                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-total">&mdash;</p>
+                </div>
+                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="clock" class="w-4 h-4 text-neutral-400"></i>
+                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Processed Today</span>
+                    </div>
+                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-today">&mdash;</p>
+                </div>
+                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-neutral-400"></i>
+                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Auto-Filed</span>
+                    </div>
+                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-filed">&mdash;</p>
+                </div>
+                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-neutral-400"></i>
+                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Document Types</span>
+                    </div>
+                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-types">&mdash;</p>
+                </div>
             </div>
-            <a href="/upload"
-                class="ml-4 bg-accent text-white px-5 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium text-sm">
-                Upload
-            </a>
-        </header>
 
-        <!-- Stats row -->
-        <div id="stats-row" class="px-6 py-4 bg-white border-b flex gap-4 flex-shrink-0">
-            <div class="bg-blue-50 rounded-lg px-4 py-3 flex-1 text-center">
-                <p class="text-2xl font-bold text-accent" id="stat-total">—</p>
-                <p class="text-xs text-gray-500 mt-1">Total Documents</p>
-            </div>
-            <div class="bg-green-50 rounded-lg px-4 py-3 flex-1 text-center">
-                <p class="text-2xl font-bold text-green-600" id="stat-today">—</p>
-                <p class="text-xs text-gray-500 mt-1">Processed Today</p>
-            </div>
-            <div class="bg-purple-50 rounded-lg px-4 py-3 flex-1 text-center">
-                <p class="text-2xl font-bold text-purple-600" id="stat-types">—</p>
-                <p class="text-xs text-gray-500 mt-1">Document Types</p>
-            </div>
-        </div>
+            <!-- Documents table -->
+            <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+                <!-- Table header -->
+                <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-neutral-950">Documents</h2>
+                    <a href="/upload" class="bg-neutral-950 text-white px-4 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium">Upload</a>
+                </div>
 
-        <!-- Document list -->
-        <div class="flex-1 overflow-y-auto px-6 py-4">
-            <div class="bg-white rounded-lg shadow">
+                <!-- Filter bar -->
+                <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-100 flex items-center gap-3">
+                    <div class="relative flex-1 max-w-xs">
+                        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+                        <input type="text" id="search-input" placeholder="Search..."
+                            class="w-full h-8 text-xs rounded-md border border-neutral-200 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                    </div>
+                </div>
+
+                <!-- Table -->
                 <table class="w-full">
-                    <thead>
-                        <tr class="border-b text-left text-xs uppercase text-gray-500">
-                            <th class="px-4 py-3 font-medium">Name</th>
-                            <th class="px-4 py-3 font-medium">Type</th>
-                            <th class="px-4 py-3 font-medium">Client</th>
-                            <th class="px-4 py-3 font-medium">Date</th>
-                            <th class="px-4 py-3 font-medium">Status</th>
-                            <th class="px-4 py-3 font-medium"></th>
+                    <thead class="bg-neutral-50">
+                        <tr>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Document Name</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Type</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Client</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Date</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Confidence</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Status</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left"></th>
                         </tr>
                     </thead>
                     <tbody id="documents-table">
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading documents...</td>
+                            <td colspan="7" class="px-6 py-8 text-center text-neutral-400 text-sm">Loading documents...</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-        </div>
-    </main>
-</div>
-
-<!-- Chat Widget -->
-<style>
-    #chat-panel {
-        width: 24rem;
-        height: 500px;
-        transition: width 0.3s ease, height 0.3s ease;
-    }
-    #chat-panel.expanded {
-        width: 60vw;
-        height: 80vh;
-    }
-    #chat-messages .bg-gray-100,
-    #chat-messages .bg-accent {
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-    }
-    #chat-panel .chat-doc-link {
-        color: #3b82f6;
-        text-decoration: underline;
-        text-decoration-color: #93c5fd;
-        display: block;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    #chat-panel .chat-doc-link:hover {
-        color: #1d4ed8;
-        text-decoration-color: #1d4ed8;
-    }
-    #chat-panel .chat-ref-section {
-        border-top: 1px solid #e5e7eb;
-        margin-top: 0.75rem;
-        padding-top: 0.5rem;
-        font-size: 0.8rem;
-        color: #6b7280;
-        overflow: hidden;
-    }
-</style>
-<div id="chat-widget" class="fixed bottom-6 right-6 z-50">
-    <!-- Chat Toggle Button -->
-    <button id="chat-toggle" onclick="toggleChat()"
-        class="w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-lg flex items-center justify-center transition-all">
-        <svg id="chat-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-        </svg>
-        <svg id="chat-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-    </button>
-
-    <!-- Chat Panel -->
-    <div id="chat-panel" class="hidden absolute bottom-16 right-0 bg-white rounded-lg shadow-2xl border flex flex-col overflow-hidden">
-        <!-- Header -->
-        <div class="bg-sidebar text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
-            <div>
-                <h3 class="font-semibold text-sm">Document Assistant</h3>
-                <p class="text-gray-400 text-xs">Ask about your documents</p>
-            </div>
-            <button id="chat-expand-btn" onclick="toggleChatExpand()" class="text-gray-400 hover:text-white ml-3 text-lg" title="Expand">&#x2922;</button>
-        </div>
-
-        <!-- Messages -->
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
-            <div class="flex justify-start">
-                <div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700">
-                    Hello! I can help you search and query your documents. Try asking things like:<br><br>
-                    <em>"What's going on with Thornton?"</em><br>
-                    <em>"Show me the Henderson engagement letter"</em><br>
-                    <em>"What was filed today?"</em><br>
-                    <em>"How much did we bill last month?"</em>
-                </div>
-            </div>
-        </div>
-
-        <!-- Input -->
-        <div class="border-t px-3 py-3 flex gap-2 flex-shrink-0">
-            <input type="text" id="chat-input" placeholder="Ask about your documents..."
-                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                onkeydown="if(event.key==='Enter')sendChatMessage()">
-            <button onclick="sendChatMessage()"
-                class="bg-accent text-white px-3 py-2 rounded-lg hover:bg-accent-hover transition-colors text-sm">
-                Send
-            </button>
-        </div>
+        </main>
     </div>
 </div>
+
+{% include 'components/chat_widget.html' %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-const CHAT_STORAGE_KEY = 'fullcapacity_chat_messages';
-const CHAT_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
-
+// Set sidebar user info and active nav
 document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    setActiveNav('nav-dashboard');
     loadStats();
     loadDocuments();
     loadFolderTree();
-    restoreChatMessages();
 });
 
 document.getElementById('search-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') searchDocuments();
 });
+
+// Global search from topbar
+const globalSearch = document.getElementById('global-search-input');
+if (globalSearch) {
+    globalSearch.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('search-input').value = globalSearch.value;
+            searchDocuments();
+        }
+    });
+}
 
 async function loadStats() {
     try {
@@ -195,6 +129,7 @@ async function loadStats() {
         const data = await res.json();
         document.getElementById('stat-total').textContent = data.total_documents;
         document.getElementById('stat-today').textContent = data.processed_today;
+        document.getElementById('stat-filed').textContent = data.by_status?.filed || 0;
         document.getElementById('stat-types').textContent = Object.keys(data.by_type).length;
     } catch (err) {
         console.error('Failed to load stats:', err);
@@ -215,29 +150,48 @@ async function loadDocuments(params = '') {
 function renderDocuments(docs) {
     const tbody = document.getElementById('documents-table');
     if (!docs || docs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No documents found. <a href="/upload" class="text-accent hover:underline">Upload your first document</a></td></tr>';
+        tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center">
+            <i data-lucide="file-x" class="w-16 h-16 text-neutral-300 mx-auto mb-3"></i>
+            <p class="text-neutral-500 text-sm">No documents found.</p>
+            <a href="/upload" class="text-neutral-950 hover:underline text-sm font-medium">Upload your first document</a>
+        </td></tr>`;
+        lucide.createIcons();
         return;
     }
 
     tbody.innerHTML = docs.map(doc => {
-        const statusColors = {
-            processing: 'bg-yellow-100 text-yellow-800',
-            classified: 'bg-blue-100 text-blue-800',
-            filed: 'bg-green-100 text-green-800',
-            error: 'bg-red-100 text-red-800',
+        const statusMap = {
+            filed: 'bg-neutral-900 text-white',
+            processing: 'bg-neutral-200 text-neutral-700',
+            classified: 'bg-neutral-200 text-neutral-700',
+            error: 'bg-red-50 text-red-700 border border-red-200',
+            duplicate: 'bg-amber-50 text-amber-700 border border-amber-200',
+            duplicate_exact: 'bg-amber-50 text-amber-700 border border-amber-200',
+            duplicate_name: 'bg-amber-50 text-amber-700 border border-amber-200',
+            duplicate_content: 'bg-amber-50 text-amber-700 border border-amber-200',
         };
-        const statusClass = statusColors[doc.status] || 'bg-gray-100 text-gray-800';
-        const docDate = doc.document_date || '—';
-        const docType = doc.document_type ? doc.document_type.replace(/_/g, ' ') : '—';
+        const statusClass = statusMap[doc.status] || 'bg-neutral-100 text-neutral-600';
+        const docDate = doc.document_date || '\u2014';
+        const docType = doc.document_type ? doc.document_type.replace(/_/g, ' ') : '\u2014';
 
-        return `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="window.location='/document/${doc.id}'">
-            <td class="px-4 py-3 text-sm font-medium text-gray-900">${escapeHtml(doc.filed_name || doc.original_filename)}</td>
-            <td class="px-4 py-3 text-sm text-gray-600 capitalize">${escapeHtml(docType)}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(doc.client_name || '—')}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(docDate)}</td>
-            <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">${doc.status}</span></td>
-            <td class="px-4 py-3 text-right">
-                <a href="/api/documents/${doc.id}/download" class="text-accent hover:underline text-sm" onclick="event.stopPropagation()">Download</a>
+        let confHtml = '\u2014';
+        if (doc.confidence_score != null) {
+            const pct = Math.round(doc.confidence_score * 100);
+            let confClass = 'font-medium text-red-600';
+            if (pct >= 90) confClass = 'font-semibold text-neutral-950';
+            else if (pct >= 70) confClass = 'font-medium text-neutral-500';
+            confHtml = `<span class="${confClass}">${pct}%</span>`;
+        }
+
+        return `<tr class="border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer transition-colors" onclick="window.location='/document/${doc.id}'">
+            <td class="px-6 py-4 text-sm font-medium text-neutral-950 max-w-xs truncate">${escapeHtml(doc.filed_name || doc.original_filename)}</td>
+            <td class="px-6 py-4"><span class="border border-neutral-300 text-neutral-600 bg-neutral-50 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize">${escapeHtml(docType)}</span></td>
+            <td class="px-6 py-4 text-sm text-neutral-600">${escapeHtml(doc.client_name || '\u2014')}</td>
+            <td class="px-6 py-4 text-sm text-neutral-500">${escapeHtml(docDate)}</td>
+            <td class="px-6 py-4 text-sm">${confHtml}</td>
+            <td class="px-6 py-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${doc.status}</span></td>
+            <td class="px-6 py-4 text-right">
+                <a href="/api/documents/${doc.id}/download" class="text-neutral-500 hover:text-neutral-950 text-sm transition-colors" onclick="event.stopPropagation()">Download</a>
             </td>
         </tr>`;
     }).join('');
@@ -245,10 +199,7 @@ function renderDocuments(docs) {
 
 async function searchDocuments() {
     const q = document.getElementById('search-input').value.trim();
-    if (!q) {
-        loadDocuments();
-        return;
-    }
+    if (!q) { loadDocuments(); return; }
     try {
         const res = await fetch('/api/documents/search?q=' + encodeURIComponent(q));
         if (!res.ok) return;
@@ -266,10 +217,11 @@ async function loadFolderTree() {
         const data = await res.json();
         const container = document.getElementById('folder-tree');
         if (!data.tree || Object.keys(data.tree).length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-xs">No folders yet</p>';
+            container.innerHTML = '<p class="text-neutral-600 text-xs px-2">No folders yet</p>';
             return;
         }
         container.innerHTML = renderTree(data.tree, '');
+        lucide.createIcons();
     } catch (err) {
         console.error('Failed to load folder tree:', err);
     }
@@ -280,26 +232,35 @@ function renderTree(node, path) {
     for (const [name, children] of Object.entries(node)) {
         const fullPath = path + '/' + name;
         const hasChildren = Object.keys(children).length > 0;
-        html += `<div class="folder-item">
-            <div class="flex items-center py-1 px-2 rounded hover:bg-sidebar-hover cursor-pointer"
-                 onclick="${hasChildren ? 'toggleFolder(this)' : `loadFolderDocs('${fullPath}')`}">
-                <span class="mr-2 text-xs">${hasChildren ? '&#9654;' : '&#9679;'}</span>
-                <span class="truncate">${escapeHtml(name.replace(/_/g, ' '))}</span>
-            </div>
-            ${hasChildren ? `<div class="folder-children pl-4">${renderTree(children, fullPath)}</div>` : ''}
-        </div>`;
+        if (hasChildren) {
+            html += `<div>
+                <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-neutral-900 transition-colors" onclick="toggleTreeFolder(this)">
+                    <i data-lucide="chevron-right" class="w-3 h-3 text-neutral-500 chevron-transition chevron-closed"></i>
+                    <i data-lucide="folder" class="w-4 h-4 text-neutral-500"></i>
+                    <span class="text-sm text-neutral-400 truncate">${escapeHtml(name.replace(/_/g, ' '))}</span>
+                </div>
+                <div class="tree-children pl-4">${renderTree(children, fullPath)}</div>
+            </div>`;
+        } else {
+            html += `<div class="flex items-center gap-2 px-2 py-1.5 pl-7 rounded-lg cursor-pointer hover:bg-neutral-900 transition-colors" onclick="loadFolderDocs('${fullPath}')">
+                <i data-lucide="file-text" class="w-4 h-4 text-neutral-600"></i>
+                <span class="text-sm text-neutral-400 truncate">${escapeHtml(name.replace(/_/g, ' '))}</span>
+            </div>`;
+        }
     }
     return html;
 }
 
-function toggleFolder(el) {
+function toggleTreeFolder(el) {
     const parent = el.parentElement;
-    parent.classList.toggle('folder-open');
-    const arrow = el.querySelector('span');
-    if (parent.classList.contains('folder-open')) {
-        arrow.innerHTML = '&#9660;';
-    } else {
-        arrow.innerHTML = '&#9654;';
+    const children = parent.querySelector('.tree-children');
+    const chevron = el.querySelector('[data-lucide="chevron-right"]');
+    if (children) {
+        children.classList.toggle('expanded');
+    }
+    if (chevron) {
+        chevron.classList.toggle('chevron-open');
+        chevron.classList.toggle('chevron-closed');
     }
 }
 
@@ -312,151 +273,6 @@ async function loadFolderDocs(path) {
     } catch (err) {
         console.error('Failed to load folder:', err);
     }
-}
-
-// Chat persistence functions
-function saveChatMessages() {
-    const messagesDiv = document.getElementById('chat-messages');
-    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
-    let createdAt;
-    if (stored) {
-        try {
-            createdAt = JSON.parse(stored).created_at;
-        } catch (e) { /* ignore */ }
-    }
-    if (!createdAt) {
-        createdAt = Date.now();
-    }
-    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
-        messages: messagesDiv.innerHTML,
-        created_at: createdAt,
-    }));
-}
-
-function restoreChatMessages() {
-    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
-    if (!stored) return;
-    try {
-        const data = JSON.parse(stored);
-        if (Date.now() - data.created_at > CHAT_EXPIRY_MS) {
-            sessionStorage.removeItem(CHAT_STORAGE_KEY);
-            return;
-        }
-        if (data.messages) {
-            document.getElementById('chat-messages').innerHTML = data.messages;
-        }
-    } catch (e) {
-        sessionStorage.removeItem(CHAT_STORAGE_KEY);
-    }
-}
-
-// Chat widget functions
-let chatExpanded = false;
-
-function toggleChat() {
-    const panel = document.getElementById('chat-panel');
-    const iconOpen = document.getElementById('chat-icon-open');
-    const iconClose = document.getElementById('chat-icon-close');
-    const isHidden = panel.classList.contains('hidden');
-    panel.classList.toggle('hidden');
-    iconOpen.classList.toggle('hidden', isHidden);
-    iconClose.classList.toggle('hidden', !isHidden);
-    if (isHidden) {
-        document.getElementById('chat-input').focus();
-        const messagesDiv = document.getElementById('chat-messages');
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-}
-
-function toggleChatExpand() {
-    const panel = document.getElementById('chat-panel');
-    const btn = document.getElementById('chat-expand-btn');
-    chatExpanded = !chatExpanded;
-    panel.classList.toggle('expanded', chatExpanded);
-    btn.innerHTML = chatExpanded ? '&#x2921;' : '&#x2922;';
-    btn.title = chatExpanded ? 'Collapse' : 'Expand';
-}
-
-function formatChatResponse(raw) {
-    // Split into conversational part and links section at the "---" separator
-    const separator = '\n\n---\n';
-    const sepIdx = raw.indexOf(separator);
-
-    let conversational, linkSection;
-    if (sepIdx !== -1) {
-        conversational = raw.substring(0, sepIdx);
-        linkSection = raw.substring(sepIdx + separator.length);
-    } else {
-        conversational = raw;
-        linkSection = '';
-    }
-
-    // Escape the conversational text, then convert newlines
-    let html = escapeHtml(conversational).replace(/\n/g, '<br>');
-
-    // Process the links section: allow <a> tags through
-    if (linkSection) {
-        const lines = linkSection.split('\n');
-        let linksHtml = '<div class="chat-ref-section">';
-        for (const line of lines) {
-            const linkMatch = line.match(/^<a href="(\/document\/[^"]+)"(?: target="_blank")?>(.+?)<\/a>(.*)$/);
-            if (linkMatch) {
-                const href = linkMatch[1];
-                const text = escapeHtml(linkMatch[2]);
-                const suffix = escapeHtml(linkMatch[3]);
-                linksHtml += `<div><a href="${href}" target="_blank" class="chat-doc-link">${text}</a><span>${suffix}</span></div>`;
-            } else {
-                linksHtml += `<div>${escapeHtml(line)}</div>`;
-            }
-        }
-        linksHtml += '</div>';
-        html += linksHtml;
-    }
-
-    return html;
-}
-
-async function sendChatMessage() {
-    const input = document.getElementById('chat-input');
-    const query = input.value.trim();
-    if (!query) return;
-
-    const messagesDiv = document.getElementById('chat-messages');
-
-    // Add user message
-    messagesDiv.innerHTML += `<div class="flex justify-end"><div class="bg-accent text-white rounded-lg px-3 py-2 max-w-[80%] text-sm">${escapeHtml(query)}</div></div>`;
-    input.value = '';
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    saveChatMessages();
-
-    // Add loading indicator
-    const loadingId = 'loading-' + Date.now();
-    messagesDiv.innerHTML += `<div id="${loadingId}" class="flex justify-start"><div class="bg-gray-100 rounded-lg px-3 py-2 text-sm text-gray-500">Thinking...</div></div>`;
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-    try {
-        const res = await fetch('/api/chat/query', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({query}),
-        });
-        const loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-
-        if (!res.ok) {
-            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 rounded-lg px-3 py-2 max-w-[80%] text-sm">Sorry, something went wrong.</div></div>`;
-        } else {
-            const data = await res.json();
-            const formatted = formatChatResponse(data.response);
-            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700">${formatted}</div></div>`;
-        }
-    } catch (err) {
-        const loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-        messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 rounded-lg px-3 py-2 max-w-[80%] text-sm">Connection error. Please try again.</div></div>`;
-    }
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    saveChatMessages();
 }
 </script>
 {% endblock %}

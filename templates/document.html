@@ -2,108 +2,150 @@
 {% block title %}Document — Full Capacity{% endblock %}
 
 {% block body %}
-<div class="min-h-screen bg-gray-50">
-    <!-- Nav bar -->
-    <nav class="bg-sidebar text-white px-6 py-4 flex items-center justify-between">
-        <a href="/dashboard" class="text-xl font-bold hover:text-gray-200">Full Capacity</a>
-        <div class="flex items-center gap-4">
-            <a href="/dashboard" class="text-sm text-gray-300 hover:text-white">Dashboard</a>
-            <a href="/upload" class="text-sm text-gray-300 hover:text-white">Upload</a>
-            <button onclick="logout()" class="text-sm text-gray-400 hover:text-white">Sign out</button>
-        </div>
-    </nav>
+<div class="flex h-screen overflow-hidden">
+    {% include 'components/sidebar.html' %}
 
-    <div class="max-w-5xl mx-auto py-8 px-4">
-        <a href="/dashboard" class="text-accent hover:underline text-sm mb-4 inline-block">&larr; Back to Dashboard</a>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        {% include 'components/topbar.html' %}
 
-        <div id="doc-loading" class="text-center py-12 text-gray-400">Loading document...</div>
-        <div id="doc-content" class="hidden">
+        <main class="flex-1 overflow-y-auto p-6 fade-in">
+            <div class="max-w-5xl mx-auto">
+                <!-- Back link -->
+                <a href="/dashboard" class="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-950 transition-colors mb-6">
+                    <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+                    Back to Dashboard
+                </a>
 
-            <!-- Header -->
-            <div class="flex items-start justify-between mb-6">
-                <div>
-                    <h1 id="doc-title" class="text-2xl font-bold text-gray-900"></h1>
-                    <p id="doc-original-name" class="text-sm text-gray-400 mt-1"></p>
-                </div>
-                <div class="flex gap-3">
-                    <a id="download-btn" href="#"
-                        class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                        Download Original
-                    </a>
-                    <button disabled
-                        class="bg-gray-200 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
-                        title="Coming soon">
-                        Reclassify
-                    </button>
+                <!-- Loading state -->
+                <div id="doc-loading" class="text-center py-16 text-neutral-400 text-sm">Loading document...</div>
+
+                <!-- Document content -->
+                <div id="doc-content" class="hidden">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between mb-6">
+                        <div>
+                            <h1 id="doc-title" class="text-2xl font-semibold text-neutral-950 tracking-tight"></h1>
+                            <p id="doc-original-name" class="text-sm text-neutral-400 mt-1"></p>
+                        </div>
+                        <div class="flex gap-3">
+                            <a id="download-btn" href="#"
+                                class="bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                                Download
+                            </a>
+                            <button id="reclassify-btn" onclick="reclassifyDocument()"
+                                class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                Reclassify
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Status / Type / Confidence row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i data-lucide="activity" class="w-4 h-4 text-neutral-400"></i>
+                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Status</h3>
+                            </div>
+                            <span id="doc-status" class="px-3 py-1 rounded-full text-xs font-medium"></span>
+                        </div>
+                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i data-lucide="tag" class="w-4 h-4 text-neutral-400"></i>
+                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Document Type</h3>
+                            </div>
+                            <p id="doc-type" class="text-lg font-semibold text-neutral-950 capitalize"></p>
+                        </div>
+                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i data-lucide="gauge" class="w-4 h-4 text-neutral-400"></i>
+                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Confidence</h3>
+                            </div>
+                            <p id="doc-confidence" class="text-lg font-bold tabular-nums"></p>
+                        </div>
+                    </div>
+
+                    <!-- Metadata + Filing cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="info" class="w-4 h-4 text-neutral-400"></i>
+                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Metadata</h3>
+                            </div>
+                            <dl class="space-y-3 text-sm">
+                                <div class="flex justify-between"><dt class="text-neutral-500">Client</dt><dd id="doc-client" class="font-medium text-neutral-950"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">Counterparty</dt><dd id="doc-counterparty" class="font-medium text-neutral-950"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">Document Date</dt><dd id="doc-date" class="font-medium text-neutral-950"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">Reference</dt><dd id="doc-reference" class="font-medium text-neutral-950"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">Amount</dt><dd id="doc-amount" class="font-medium text-neutral-950"></dd></div>
+                            </dl>
+                        </div>
+                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="folder" class="w-4 h-4 text-neutral-400"></i>
+                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Filing Info</h3>
+                            </div>
+                            <dl class="space-y-3 text-sm">
+                                <div class="flex justify-between"><dt class="text-neutral-500">Filed Name</dt><dd id="doc-filed-name" class="font-medium text-neutral-950 text-right max-w-[250px] truncate"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">Folder Path</dt><dd id="doc-folder" class="font-medium text-neutral-950 text-right max-w-[250px] truncate"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">File Size</dt><dd id="doc-size" class="font-medium text-neutral-950"></dd></div>
+                                <div class="flex justify-between"><dt class="text-neutral-500">Uploaded</dt><dd id="doc-uploaded" class="font-medium text-neutral-950"></dd></div>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- AI Summary -->
+                    <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-neutral-400"></i>
+                            <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">AI Summary</h3>
+                        </div>
+                        <p id="doc-summary" class="text-sm text-neutral-700 leading-relaxed"></p>
+                    </div>
+
+                    <!-- Tags -->
+                    <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i data-lucide="hash" class="w-4 h-4 text-neutral-400"></i>
+                            <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Tags</h3>
+                        </div>
+                        <div id="doc-tags" class="flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <!-- Extracted Text -->
+                    <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
+                            <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Extracted Text</h3>
+                        </div>
+                        <div id="doc-text" class="max-h-96 overflow-y-auto bg-neutral-50 border border-neutral-200 p-4 rounded-lg text-sm text-neutral-700 whitespace-pre-wrap font-mono"></div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Status & Classification -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white rounded-lg border p-4">
-                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Status</h3>
-                    <span id="doc-status" class="px-3 py-1 rounded-full text-sm font-medium"></span>
-                </div>
-                <div class="bg-white rounded-lg border p-4">
-                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Document Type</h3>
-                    <p id="doc-type" class="text-lg font-medium text-gray-900 capitalize"></p>
-                </div>
-                <div class="bg-white rounded-lg border p-4">
-                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Confidence</h3>
-                    <p id="doc-confidence" class="text-lg font-bold"></p>
-                </div>
-            </div>
-
-            <!-- Metadata cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div class="bg-white rounded-lg border p-4">
-                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-3">Metadata</h3>
-                    <dl class="space-y-2 text-sm">
-                        <div class="flex justify-between"><dt class="text-gray-500">Client</dt><dd id="doc-client" class="font-medium text-gray-900"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">Counterparty</dt><dd id="doc-counterparty" class="font-medium text-gray-900"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">Document Date</dt><dd id="doc-date" class="font-medium text-gray-900"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">Reference</dt><dd id="doc-reference" class="font-medium text-gray-900"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">Amount</dt><dd id="doc-amount" class="font-medium text-gray-900"></dd></div>
-                    </dl>
-                </div>
-                <div class="bg-white rounded-lg border p-4">
-                    <h3 class="text-xs uppercase text-gray-400 font-semibold mb-3">Filing Info</h3>
-                    <dl class="space-y-2 text-sm">
-                        <div class="flex justify-between"><dt class="text-gray-500">Filed Name</dt><dd id="doc-filed-name" class="font-medium text-gray-900 text-right max-w-[250px] truncate"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">Folder Path</dt><dd id="doc-folder" class="font-medium text-gray-900 text-right max-w-[250px] truncate"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">File Size</dt><dd id="doc-size" class="font-medium text-gray-900"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">Uploaded</dt><dd id="doc-uploaded" class="font-medium text-gray-900"></dd></div>
-                    </dl>
-                </div>
-            </div>
-
-            <!-- Summary -->
-            <div class="bg-white rounded-lg border p-4 mb-6">
-                <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">AI Summary</h3>
-                <p id="doc-summary" class="text-gray-700"></p>
-            </div>
-
-            <!-- Tags -->
-            <div class="bg-white rounded-lg border p-4 mb-6">
-                <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Tags</h3>
-                <div id="doc-tags" class="flex flex-wrap gap-2"></div>
-            </div>
-
-            <!-- Extracted text -->
-            <div class="bg-white rounded-lg border p-4">
-                <h3 class="text-xs uppercase text-gray-400 font-semibold mb-2">Extracted Text</h3>
-                <div id="doc-text" class="max-h-96 overflow-y-auto bg-gray-50 p-4 rounded text-sm text-gray-700 whitespace-pre-wrap font-mono"></div>
-            </div>
-        </div>
+        </main>
     </div>
 </div>
+
+{% include 'components/chat_widget.html' %}
 {% endblock %}
 
 {% block scripts %}
 <script>
 const docId = '{{ doc_id }}';
 
-document.addEventListener('DOMContentLoaded', loadDocument);
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    setActiveNav('nav-documents');
+    loadDocument();
+});
 
 async function loadDocument() {
     try {
@@ -129,42 +171,46 @@ function renderDocument(doc) {
 
     // Status
     const statusEl = document.getElementById('doc-status');
-    const statusColors = {
-        processing: 'bg-yellow-100 text-yellow-800',
-        classified: 'bg-blue-100 text-blue-800',
-        filed: 'bg-green-100 text-green-800',
-        error: 'bg-red-100 text-red-800',
+    const statusMap = {
+        filed: 'bg-neutral-900 text-white',
+        processing: 'bg-neutral-200 text-neutral-700',
+        classified: 'bg-neutral-200 text-neutral-700',
+        error: 'bg-red-50 text-red-700 border border-red-200',
+        duplicate: 'bg-amber-50 text-amber-700 border border-amber-200',
+        duplicate_exact: 'bg-amber-50 text-amber-700 border border-amber-200',
+        duplicate_name: 'bg-amber-50 text-amber-700 border border-amber-200',
+        duplicate_content: 'bg-amber-50 text-amber-700 border border-amber-200',
     };
     statusEl.textContent = doc.status;
-    statusEl.className = `px-3 py-1 rounded-full text-sm font-medium ${statusColors[doc.status] || 'bg-gray-100'}`;
+    statusEl.className = `px-3 py-1 rounded-full text-xs font-medium ${statusMap[doc.status] || 'bg-neutral-100 text-neutral-600'}`;
 
     // Type & confidence
-    document.getElementById('doc-type').textContent = (doc.document_type || '—').replace(/_/g, ' ');
+    document.getElementById('doc-type').textContent = (doc.document_type || '\u2014').replace(/_/g, ' ');
 
     const confEl = document.getElementById('doc-confidence');
     const conf = doc.confidence_score;
     if (conf != null) {
         const pct = Math.round(conf * 100);
         confEl.textContent = pct + '%';
-        if (conf >= 0.8) confEl.className = 'text-lg font-bold confidence-high';
-        else if (conf >= 0.5) confEl.className = 'text-lg font-bold confidence-medium';
-        else confEl.className = 'text-lg font-bold confidence-low';
+        if (pct >= 90) confEl.className = 'text-lg font-bold tabular-nums text-neutral-950';
+        else if (pct >= 70) confEl.className = 'text-lg font-bold tabular-nums text-neutral-500';
+        else confEl.className = 'text-lg font-bold tabular-nums text-red-600';
     } else {
-        confEl.textContent = '—';
+        confEl.textContent = '\u2014';
     }
 
     // Metadata
-    document.getElementById('doc-client').textContent = doc.client_name || '—';
-    document.getElementById('doc-counterparty').textContent = doc.counterparty || '—';
-    document.getElementById('doc-date').textContent = doc.document_date || '—';
-    document.getElementById('doc-reference').textContent = doc.matter_reference || '—';
-    document.getElementById('doc-amount').textContent = doc.amount ? `${doc.currency || 'GBP'} ${Number(doc.amount).toLocaleString()}` : '—';
+    document.getElementById('doc-client').textContent = doc.client_name || '\u2014';
+    document.getElementById('doc-counterparty').textContent = doc.counterparty || '\u2014';
+    document.getElementById('doc-date').textContent = doc.document_date || '\u2014';
+    document.getElementById('doc-reference').textContent = doc.matter_reference || '\u2014';
+    document.getElementById('doc-amount').textContent = doc.amount ? `${doc.currency || 'GBP'} ${Number(doc.amount).toLocaleString()}` : '\u2014';
 
     // Filing
-    document.getElementById('doc-filed-name').textContent = doc.filed_name || '—';
-    document.getElementById('doc-folder').textContent = doc.folder_path || '—';
-    document.getElementById('doc-size').textContent = doc.file_size_bytes ? formatSize(doc.file_size_bytes) : '—';
-    document.getElementById('doc-uploaded').textContent = doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : '—';
+    document.getElementById('doc-filed-name').textContent = doc.filed_name || '\u2014';
+    document.getElementById('doc-folder').textContent = doc.folder_path || '\u2014';
+    document.getElementById('doc-size').textContent = doc.file_size_bytes ? formatSize(doc.file_size_bytes) : '\u2014';
+    document.getElementById('doc-uploaded').textContent = doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : '\u2014';
 
     // Summary
     document.getElementById('doc-summary').textContent = doc.summary || 'No summary available.';
@@ -173,14 +219,38 @@ function renderDocument(doc) {
     const tagsContainer = document.getElementById('doc-tags');
     if (doc.tags && doc.tags.length > 0) {
         tagsContainer.innerHTML = doc.tags.map(t =>
-            `<span class="bg-blue-50 text-accent px-3 py-1 rounded-full text-xs font-medium">${escapeHtml(t)}</span>`
+            `<span class="border border-neutral-300 bg-neutral-50 text-neutral-600 px-3 py-1 rounded-full text-xs font-medium">${escapeHtml(t)}</span>`
         ).join('');
     } else {
-        tagsContainer.innerHTML = '<span class="text-gray-400 text-sm">No tags</span>';
+        tagsContainer.innerHTML = '<span class="text-neutral-400 text-sm">No tags</span>';
     }
 
     // Extracted text
     document.getElementById('doc-text').textContent = doc.extracted_text || 'No text extracted.';
+
+    lucide.createIcons();
+}
+
+async function reclassifyDocument() {
+    const btn = document.getElementById('reclassify-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 spinner"></i> Reclassifying...';
+    lucide.createIcons();
+    try {
+        const res = await fetch(`/api/documents/${docId}/reclassify`, { method: 'POST' });
+        if (res.ok) {
+            const doc = await res.json();
+            renderDocument(doc);
+        } else {
+            const data = await res.json();
+            alert('Reclassify failed: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Reclassify failed: ' + err.message);
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i> Reclassify';
+    lucide.createIcons();
 }
 
 function formatSize(bytes) {

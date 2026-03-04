@@ -9,26 +9,45 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        sidebar: '#1a1a2e',
-                        'sidebar-hover': '#16213e',
-                        accent: '#4a90d9',
-                        'accent-hover': '#357abd',
-                    }
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
                 }
             }
         }
     </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    {% block head %}{% endblock %}
     <style>
-        .folder-tree .folder-children { display: none; }
-        .folder-tree .folder-open > .folder-children { display: block; }
-        .drop-zone.dragover { border-color: #4a90d9; background-color: rgba(74, 144, 217, 0.05); }
-        .confidence-high { color: #16a34a; }
-        .confidence-medium { color: #ca8a04; }
-        .confidence-low { color: #dc2626; }
+        .sidebar-transition { transition: width 300ms ease-in-out; }
+        .card-hover { transition: all 200ms ease; }
+        .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: #d4d4d4; }
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .alert-animate { animation: slideDown 300ms ease-out forwards; }
+        .tree-children { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 250ms ease, opacity 200ms ease; }
+        .tree-children.expanded { max-height: 2000px; opacity: 1; }
+        .nav-active { position: relative; background: #171717; }
+        .nav-active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 20%; height: 60%; width: 2px;
+            background: #ffffff;
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 8px rgba(255,255,255,0.3), 0 0 20px rgba(255,255,255,0.1);
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 300ms ease-out forwards; }
+        .chevron-open { transform: rotate(90deg); }
+        .chevron-closed { transform: rotate(0deg); }
+        .chevron-transition { transition: transform 200ms ease; }
+        .drop-zone.dragover { border-color: #0a0a0a; background-color: #f5f5f5; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-neutral-50 font-sans antialiased">
     {% block body %}{% endblock %}
     <script src="/static/js/app.js"></script>
     {% block scripts %}{% endblock %}

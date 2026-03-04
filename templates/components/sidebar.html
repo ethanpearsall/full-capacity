@@ -1,0 +1,136 @@
+<!-- Sidebar -->
+<aside id="sidebar" class="bg-black text-white flex flex-col flex-shrink-0 sidebar-transition h-screen" style="width: 256px;">
+    <!-- Logo -->
+    <div class="px-6 py-5 border-b border-neutral-800 flex items-center justify-between">
+        <span id="sidebar-logo-full" class="text-sm font-bold tracking-[0.2em] uppercase text-white">Full Capacity</span>
+        <span id="sidebar-logo-short" class="text-lg font-bold text-white hidden">FC</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex flex-col gap-1 px-3 py-4 flex-1">
+        <a href="/dashboard" id="nav-dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 text-neutral-500 hover:text-white hover:bg-neutral-900">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="/dashboard" id="nav-documents" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 text-neutral-500 hover:text-white hover:bg-neutral-900">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span class="nav-label">Documents</span>
+        </a>
+        <a href="/upload" id="nav-upload" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 text-neutral-500 hover:text-white hover:bg-neutral-900">
+            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+            <span class="nav-label">Upload</span>
+        </a>
+
+        <div class="border-t border-neutral-800 my-3 mx-3"></div>
+
+        <!-- Folder Tree -->
+        <div id="sidebar-folders" class="flex-1 overflow-y-auto px-1">
+            <p class="text-xs uppercase text-neutral-600 font-semibold mb-2 tracking-wider px-2 nav-label">Folders</p>
+            <div id="folder-tree" class="text-sm"></div>
+        </div>
+    </nav>
+
+    <!-- User section -->
+    <div class="px-4 py-4 border-t border-neutral-800">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-neutral-800 text-white flex items-center justify-center text-xs font-medium flex-shrink-0" id="user-avatar"></div>
+            <div class="nav-label overflow-hidden">
+                <p class="text-sm text-white truncate" id="sidebar-user-name"></p>
+                <p class="text-xs text-neutral-500 truncate" id="sidebar-org-name"></p>
+            </div>
+        </div>
+        <button onclick="logout()" class="flex items-center gap-2 px-3 py-2 mt-3 rounded-lg text-sm text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors w-full">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+            <span class="nav-label">Sign out</span>
+        </button>
+    </div>
+
+    <!-- Collapse toggle -->
+    <div class="px-3 py-2 border-t border-neutral-800">
+        <button onclick="toggleSidebar()" class="flex items-center justify-center w-full py-1.5 rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors">
+            <i data-lucide="chevron-left" id="sidebar-collapse-icon" class="w-4 h-4"></i>
+        </button>
+    </div>
+</aside>
+
+<!-- Mobile overlay -->
+<div id="mobile-sidebar-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" onclick="closeMobileSidebar()"></div>
+
+<script>
+// Sidebar collapse
+let sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+
+function applySidebarState() {
+    const sidebar = document.getElementById('sidebar');
+    const icon = document.getElementById('sidebar-collapse-icon');
+    const logoFull = document.getElementById('sidebar-logo-full');
+    const logoShort = document.getElementById('sidebar-logo-short');
+
+    if (sidebarCollapsed) {
+        sidebar.style.width = '64px';
+        sidebar.querySelectorAll('.nav-label').forEach(el => el.classList.add('hidden'));
+        icon.setAttribute('data-lucide', 'chevron-right');
+        logoFull.classList.add('hidden');
+        logoShort.classList.remove('hidden');
+        document.getElementById('sidebar-folders').classList.add('hidden');
+    } else {
+        sidebar.style.width = '256px';
+        sidebar.querySelectorAll('.nav-label').forEach(el => el.classList.remove('hidden'));
+        icon.setAttribute('data-lucide', 'chevron-left');
+        logoFull.classList.remove('hidden');
+        logoShort.classList.add('hidden');
+        document.getElementById('sidebar-folders').classList.remove('hidden');
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function toggleSidebar() {
+    sidebarCollapsed = !sidebarCollapsed;
+    localStorage.setItem('sidebar-collapsed', sidebarCollapsed);
+    applySidebarState();
+}
+
+function setActiveNav(id) {
+    document.querySelectorAll('#sidebar nav a').forEach(a => {
+        a.classList.remove('nav-active', 'text-white');
+        a.classList.add('text-neutral-500');
+    });
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.add('nav-active', 'text-white');
+        el.classList.remove('text-neutral-500');
+    }
+}
+
+// Mobile sidebar
+function openMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('mobile-sidebar-backdrop');
+    sidebar.style.width = '256px';
+    sidebar.classList.add('fixed', 'z-50', 'left-0', 'top-0');
+    sidebar.querySelectorAll('.nav-label').forEach(el => el.classList.remove('hidden'));
+    backdrop.classList.remove('hidden');
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('mobile-sidebar-backdrop');
+    sidebar.classList.remove('fixed', 'z-50', 'left-0', 'top-0');
+    backdrop.classList.add('hidden');
+    applySidebarState();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    applySidebarState();
+    // Set user info
+    const avatarEl = document.getElementById('user-avatar');
+    const nameEl = document.getElementById('sidebar-user-name');
+    const orgEl = document.getElementById('sidebar-org-name');
+    if (avatarEl && nameEl) {
+        const email = nameEl.dataset.email || '';
+        if (email) {
+            avatarEl.textContent = email.charAt(0).toUpperCase();
+        }
+    }
+});
+</script>

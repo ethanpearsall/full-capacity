@@ -1,0 +1,38 @@
+<!-- Top Bar -->
+<header class="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+    <!-- Left: mobile hamburger + page title -->
+    <div class="flex items-center gap-4">
+        <button onclick="openMobileSidebar()" class="lg:hidden text-neutral-500 hover:text-neutral-950">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <div>
+            <h1 id="page-title" class="text-xl font-semibold text-neutral-950 tracking-tight">{% block page_title %}Dashboard{% endblock %}</h1>
+        </div>
+    </div>
+
+    <!-- Center: search -->
+    <div class="hidden md:flex items-center flex-1 max-w-md mx-8 relative">
+        <div class="relative w-full">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+            <input type="text" id="global-search-input" placeholder="Search documents..."
+                class="w-full bg-neutral-100 rounded-lg pl-10 pr-16 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:bg-white transition-colors">
+            <kbd class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400 bg-neutral-200 rounded px-1.5 py-0.5 font-mono">Ctrl+K</kbd>
+        </div>
+    </div>
+
+    <!-- Right: avatar -->
+    <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-neutral-950 text-white flex items-center justify-center text-xs font-medium" id="topbar-avatar"></div>
+    </div>
+</header>
+
+<script>
+// Ctrl+K shortcut
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const input = document.getElementById('global-search-input');
+        if (input) input.focus();
+    }
+});
+</script>
