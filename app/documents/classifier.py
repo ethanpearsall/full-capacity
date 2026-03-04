@@ -67,7 +67,7 @@ DOCUMENT TEXT:
 
 MAX_TEXT_LENGTH = 15000  # Limit text sent to Claude to control costs
 
-MODEL = "claude-3-5-sonnet-20241022"
+MODEL = "claude-sonnet-4-20250514"
 
 
 def classify_document(text: str, original_filename: str = "") -> ClassificationResult:

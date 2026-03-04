@@ -10,7 +10,7 @@ from app.database import get_supabase_admin
 
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-3-5-sonnet-20241022"
+MODEL = "claude-sonnet-4-20250514"
 
 QUERY_PROMPT = """You are a document search assistant for a professional services firm.
 The user wants to find or ask about documents in their filing system.
