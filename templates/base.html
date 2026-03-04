@@ -130,18 +130,6 @@
         }
         .bento-card:hover .bento-overlay { background: rgba(0,0,0,0.02); }
 
-        /* Stacked cards */
-        .stack-container { display: grid; }
-        .stack-container > * { grid-area: 1 / 1; }
-        .stack-card { transform-origin: center; transition: all 500ms ease; }
-        .stack-card::before {
-            content: ''; position: absolute; inset: 0;
-            background: rgba(0,0,0,0.3); border-radius: 0.75rem;
-            transition: opacity 500ms ease;
-        }
-        .stack-card:hover::before { opacity: 0; }
-        .stack-card:hover { transform: translateY(-8px) !important; filter: none !important; }
-
         /* Status dot pulse */
         @keyframes statusPulse {
             0%, 100% { opacity: 1; }

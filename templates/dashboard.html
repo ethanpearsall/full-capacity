@@ -62,11 +62,9 @@
     </div>
 </div>
 
-<!-- Two-column layout: documents table + right panel -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Documents table (col-span-2) -->
-    <div class="lg:col-span-2" id="documents-section">
-        <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+<!-- Documents table -->
+<div id="documents-section">
+    <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
             <!-- Table header -->
             <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-neutral-950">Documents</h2>
@@ -115,25 +113,6 @@
                     <button onclick="prevPage()" id="btn-prev" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Prev</button>
                     <button onclick="nextPage()" id="btn-next" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Next</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Right panel -->
-    <div class="space-y-6">
-        <!-- Stacked display cards -->
-        <div>
-            <h3 class="text-sm font-semibold text-neutral-950 mb-3">Recent Uploads</h3>
-            <div class="stack-container h-48" id="stacked-cards">
-                <div class="text-center py-8 text-neutral-400 text-xs">Loading...</div>
-            </div>
-        </div>
-
-        <!-- Activity feed -->
-        <div>
-            <h3 class="text-sm font-semibold text-neutral-950 mb-3">Recent Activity</h3>
-            <div class="bg-neutral-50 border border-neutral-200 rounded-xl p-4 space-y-3" id="activity-feed">
-                <div class="text-center py-4 text-neutral-400 text-xs">Loading...</div>
             </div>
         </div>
     </div>
@@ -192,8 +171,6 @@ async function loadDocuments(params = '') {
         allDocs = data.documents || [];
         currentPage = 0;
         renderPage();
-        renderStackedCards(allDocs.slice(0, 3));
-        renderActivityFeed(allDocs.slice(0, 5));
         computeAvgConfidence(allDocs);
     } catch (err) {
         console.error('Failed to load documents:', err);
@@ -313,85 +290,6 @@ function renderDocuments(docs) {
         </tr>`;
     }).join('');
     lucide.createIcons();
-}
-
-// Stacked display cards
-function renderStackedCards(docs) {
-    const container = document.getElementById('stacked-cards');
-    if (!docs || docs.length === 0) {
-        container.innerHTML = '<div class="text-center py-8 text-neutral-400 text-xs">No recent uploads</div>';
-        return;
-    }
-    const cards = docs.slice(0, 3).map((doc, i) => {
-        const name = doc.filed_name || doc.original_filename || 'Untitled';
-        const docType = (doc.document_type || '').replace(/_/g, ' ');
-        const time = doc.uploaded_at ? timeAgo(doc.uploaded_at) : '';
-        const offset = i * 16;
-        const yOffset = i * 8;
-        const isTop = i === docs.slice(0, 3).length - 1;
-        const filter = isTop ? '' : `filter: brightness(${0.7 + i * 0.1})`;
-        const zIndex = i + 1;
-        return `<div class="stack-card bg-neutral-900 text-white border border-neutral-800 rounded-xl p-4 cursor-pointer"
-                     style="transform: translateX(${offset}px) translateY(${yOffset}px) skewY(-4deg); z-index: ${zIndex}; ${filter}"
-                     onclick="window.location='/document/${doc.id}'">
-            <div class="flex items-center gap-2 mb-2">
-                <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
-                <span class="text-xs font-medium truncate">${escapeHtml(name)}</span>
-            </div>
-            <p class="text-xs text-neutral-500">${escapeHtml(docType)}</p>
-            ${time ? `<p class="text-xs text-neutral-600 mt-1">${time}</p>` : ''}
-        </div>`;
-    }).join('');
-    container.innerHTML = cards;
-    lucide.createIcons();
-}
-
-// Activity feed
-function renderActivityFeed(docs) {
-    const container = document.getElementById('activity-feed');
-    if (!docs || docs.length === 0) {
-        container.innerHTML = '<div class="text-center py-4 text-neutral-400 text-xs">No recent activity</div>';
-        return;
-    }
-    container.innerHTML = docs.map(doc => {
-        const name = doc.filed_name || doc.original_filename || 'Untitled';
-        const docType = (doc.document_type || '').replace(/_/g, ' ');
-        const time = doc.uploaded_at ? timeAgo(doc.uploaded_at) : '';
-        const statusLabel = doc.status === 'filed' ? 'Auto-filed' : doc.status === 'error' ? 'Error' : doc.status === 'processing' ? 'Processing' : 'Uploaded';
-        const client = doc.client_name || '';
-        const folderPath = doc.folder_path || '';
-        let desc = `${name}`;
-        if (doc.status === 'filed' && folderPath) {
-            desc += ` filed to ${folderPath}`;
-        } else if (doc.status === 'error') {
-            desc += ` failed processing`;
-        }
-        const initial = name.charAt(0).toUpperCase();
-        const dotColor = doc.status === 'filed' ? 'bg-neutral-950' : doc.status === 'error' ? 'bg-red-500' : 'bg-neutral-300';
-
-        return `<div class="flex items-start gap-3">
-            <div class="relative flex-shrink-0">
-                <div class="w-8 h-8 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs font-medium">${initial}</div>
-                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${dotColor} ring-2 ring-neutral-50"></div>
-            </div>
-            <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-neutral-700">${escapeHtml(statusLabel)}</p>
-                <p class="text-[13px] text-neutral-500 truncate">${escapeHtml(desc)}</p>
-                ${time ? `<p class="text-[12px] text-neutral-400">${time}</p>` : ''}
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function timeAgo(dateStr) {
-    const now = new Date();
-    const then = new Date(dateStr);
-    const diff = Math.floor((now - then) / 1000);
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
-    if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
-    return then.toLocaleDateString();
 }
 
 // Search & filter
