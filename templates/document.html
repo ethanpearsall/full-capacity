@@ -1,133 +1,127 @@
 {% extends "base.html" %}
 {% block title %}Document — Full Capacity{% endblock %}
 
-{% block body %}
-<div class="flex h-screen overflow-hidden">
-    {% include 'components/sidebar.html' %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <!-- Back link -->
+    <a href="/dashboard" class="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-950 transition-colors mb-6">
+        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+        Back to Dashboard
+    </a>
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        {% include 'components/topbar.html' %}
+    <!-- Loading state -->
+    <div id="doc-loading" class="text-center py-16">
+        <div class="luma-spinner text-neutral-300 mx-auto" style="width:50px;"><span></span><span></span></div>
+        <p class="text-neutral-400 text-sm mt-4">Loading document...</p>
+    </div>
 
-        <main class="flex-1 overflow-y-auto p-6 fade-in">
-            <div class="max-w-5xl mx-auto">
-                <!-- Back link -->
-                <a href="/dashboard" class="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-950 transition-colors mb-6">
-                    <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-                    Back to Dashboard
-                </a>
-
-                <!-- Loading state -->
-                <div id="doc-loading" class="text-center py-16 text-neutral-400 text-sm">Loading document...</div>
-
-                <!-- Document content -->
-                <div id="doc-content" class="hidden">
-                    <!-- Header -->
-                    <div class="flex items-start justify-between mb-6">
-                        <div>
-                            <h1 id="doc-title" class="text-2xl font-semibold text-neutral-950 tracking-tight"></h1>
-                            <p id="doc-original-name" class="text-sm text-neutral-400 mt-1"></p>
-                        </div>
-                        <div class="flex gap-3">
-                            <a id="download-btn" href="#"
-                                class="bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
-                                <i data-lucide="download" class="w-4 h-4"></i>
-                                Download
-                            </a>
-                            <button id="reclassify-btn" onclick="reclassifyDocument()"
-                                class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
-                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                                Reclassify
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Status / Type / Confidence row -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i data-lucide="activity" class="w-4 h-4 text-neutral-400"></i>
-                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Status</h3>
-                            </div>
-                            <span id="doc-status" class="px-3 py-1 rounded-full text-xs font-medium"></span>
-                        </div>
-                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i data-lucide="tag" class="w-4 h-4 text-neutral-400"></i>
-                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Document Type</h3>
-                            </div>
-                            <p id="doc-type" class="text-lg font-semibold text-neutral-950 capitalize"></p>
-                        </div>
-                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i data-lucide="gauge" class="w-4 h-4 text-neutral-400"></i>
-                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Confidence</h3>
-                            </div>
-                            <p id="doc-confidence" class="text-lg font-bold tabular-nums"></p>
-                        </div>
-                    </div>
-
-                    <!-- Metadata + Filing cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
-                            <div class="flex items-center gap-2 mb-4">
-                                <i data-lucide="info" class="w-4 h-4 text-neutral-400"></i>
-                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Metadata</h3>
-                            </div>
-                            <dl class="space-y-3 text-sm">
-                                <div class="flex justify-between"><dt class="text-neutral-500">Client</dt><dd id="doc-client" class="font-medium text-neutral-950"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">Counterparty</dt><dd id="doc-counterparty" class="font-medium text-neutral-950"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">Document Date</dt><dd id="doc-date" class="font-medium text-neutral-950"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">Reference</dt><dd id="doc-reference" class="font-medium text-neutral-950"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">Amount</dt><dd id="doc-amount" class="font-medium text-neutral-950"></dd></div>
-                            </dl>
-                        </div>
-                        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
-                            <div class="flex items-center gap-2 mb-4">
-                                <i data-lucide="folder" class="w-4 h-4 text-neutral-400"></i>
-                                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Filing Info</h3>
-                            </div>
-                            <dl class="space-y-3 text-sm">
-                                <div class="flex justify-between"><dt class="text-neutral-500">Filed Name</dt><dd id="doc-filed-name" class="font-medium text-neutral-950 text-right max-w-[250px] truncate"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">Folder Path</dt><dd id="doc-folder" class="font-medium text-neutral-950 text-right max-w-[250px] truncate"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">File Size</dt><dd id="doc-size" class="font-medium text-neutral-950"></dd></div>
-                                <div class="flex justify-between"><dt class="text-neutral-500">Uploaded</dt><dd id="doc-uploaded" class="font-medium text-neutral-950"></dd></div>
-                            </dl>
-                        </div>
-                    </div>
-
-                    <!-- AI Summary -->
-                    <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
-                        <div class="flex items-center gap-2 mb-3">
-                            <i data-lucide="sparkles" class="w-4 h-4 text-neutral-400"></i>
-                            <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">AI Summary</h3>
-                        </div>
-                        <p id="doc-summary" class="text-sm text-neutral-700 leading-relaxed"></p>
-                    </div>
-
-                    <!-- Tags -->
-                    <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
-                        <div class="flex items-center gap-2 mb-3">
-                            <i data-lucide="hash" class="w-4 h-4 text-neutral-400"></i>
-                            <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Tags</h3>
-                        </div>
-                        <div id="doc-tags" class="flex flex-wrap gap-2"></div>
-                    </div>
-
-                    <!-- Extracted Text -->
-                    <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
-                        <div class="flex items-center gap-2 mb-3">
-                            <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
-                            <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Extracted Text</h3>
-                        </div>
-                        <div id="doc-text" class="max-h-96 overflow-y-auto bg-neutral-50 border border-neutral-200 p-4 rounded-lg text-sm text-neutral-700 whitespace-pre-wrap font-mono"></div>
-                    </div>
-                </div>
+    <!-- Document content -->
+    <div id="doc-content" class="hidden">
+        <!-- Header -->
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <h1 id="doc-title" class="text-2xl font-semibold text-neutral-950 tracking-tight"></h1>
+                <p id="doc-original-name" class="text-sm text-neutral-400 mt-1"></p>
             </div>
-        </main>
+            <div class="flex gap-3">
+                <a id="download-btn" href="#"
+                    class="bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Download
+                </a>
+                <button id="reclassify-btn" onclick="reclassifyDocument()"
+                    class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    <span id="reclassify-text">Reclassify</span>
+                    <div id="reclassify-spinner" class="hidden luma-spinner text-neutral-700" style="width:16px;">
+                        <span></span><span></span>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Status / Type / Confidence row -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="activity" class="w-4 h-4 text-neutral-400"></i>
+                    <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Status</h3>
+                </div>
+                <span id="doc-status" class="px-3 py-1 rounded-full text-xs font-medium"></span>
+            </div>
+            <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="tag" class="w-4 h-4 text-neutral-400"></i>
+                    <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Document Type</h3>
+                </div>
+                <p id="doc-type" class="text-lg font-semibold text-neutral-950 capitalize"></p>
+            </div>
+            <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="gauge" class="w-4 h-4 text-neutral-400"></i>
+                    <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Confidence</h3>
+                </div>
+                <p id="doc-confidence" class="text-lg font-bold tabular-nums"></p>
+            </div>
+        </div>
+
+        <!-- Metadata + Filing cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="info" class="w-4 h-4 text-neutral-400"></i>
+                    <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Metadata</h3>
+                </div>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between"><dt class="text-neutral-500">Client</dt><dd id="doc-client" class="font-medium text-neutral-950"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">Counterparty</dt><dd id="doc-counterparty" class="font-medium text-neutral-950"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">Document Date</dt><dd id="doc-date" class="font-medium text-neutral-950"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">Reference</dt><dd id="doc-reference" class="font-medium text-neutral-950"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">Amount</dt><dd id="doc-amount" class="font-medium text-neutral-950"></dd></div>
+                </dl>
+            </div>
+            <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="folder" class="w-4 h-4 text-neutral-400"></i>
+                    <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Filing Info</h3>
+                </div>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between"><dt class="text-neutral-500">Filed Name</dt><dd id="doc-filed-name" class="font-medium text-neutral-950 text-right max-w-[250px] truncate"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">Folder Path</dt><dd id="doc-folder" class="font-medium text-neutral-950 text-right max-w-[250px] truncate"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">File Size</dt><dd id="doc-size" class="font-medium text-neutral-950"></dd></div>
+                    <div class="flex justify-between"><dt class="text-neutral-500">Uploaded</dt><dd id="doc-uploaded" class="font-medium text-neutral-950"></dd></div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- AI Summary -->
+        <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="sparkles" class="w-4 h-4 text-neutral-400"></i>
+                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">AI Summary</h3>
+            </div>
+            <p id="doc-summary" class="text-sm text-neutral-700 leading-relaxed"></p>
+        </div>
+
+        <!-- Tags -->
+        <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="hash" class="w-4 h-4 text-neutral-400"></i>
+                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Tags</h3>
+            </div>
+            <div id="doc-tags" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Extracted Text -->
+        <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
+                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Extracted Text</h3>
+            </div>
+            <div id="doc-text" class="max-h-96 overflow-y-auto bg-neutral-50 border border-neutral-200 p-4 rounded-lg text-sm text-neutral-700 whitespace-pre-wrap font-mono"></div>
+        </div>
     </div>
 </div>
-
-{% include 'components/chat_widget.html' %}
 {% endblock %}
 
 {% block scripts %}
@@ -143,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
     const topAvatar = document.getElementById('topbar-avatar');
     if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Document';
     setActiveNav('nav-documents');
     loadDocument();
 });
@@ -151,13 +146,13 @@ async function loadDocument() {
     try {
         const res = await fetch(`/api/documents/${docId}`);
         if (!res.ok) {
-            document.getElementById('doc-loading').textContent = 'Document not found.';
+            document.getElementById('doc-loading').innerHTML = '<p class="text-neutral-400 text-sm">Document not found.</p>';
             return;
         }
         const doc = await res.json();
         renderDocument(doc);
     } catch (err) {
-        document.getElementById('doc-loading').textContent = 'Failed to load document.';
+        document.getElementById('doc-loading').innerHTML = '<p class="text-neutral-400 text-sm">Failed to load document.</p>';
     }
 }
 
@@ -233,9 +228,11 @@ function renderDocument(doc) {
 
 async function reclassifyDocument() {
     const btn = document.getElementById('reclassify-btn');
+    const reclassifyText = document.getElementById('reclassify-text');
+    const reclassifySpinner = document.getElementById('reclassify-spinner');
     btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 spinner"></i> Reclassifying...';
-    lucide.createIcons();
+    reclassifyText.textContent = 'Reclassifying...';
+    reclassifySpinner.classList.remove('hidden');
     try {
         const res = await fetch(`/api/documents/${docId}/reclassify`, { method: 'POST' });
         if (res.ok) {
@@ -249,8 +246,8 @@ async function reclassifyDocument() {
         alert('Reclassify failed: ' + err.message);
     }
     btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i> Reclassify';
-    lucide.createIcons();
+    reclassifyText.textContent = 'Reclassify';
+    reclassifySpinner.classList.add('hidden');
 }
 
 function formatSize(bytes) {

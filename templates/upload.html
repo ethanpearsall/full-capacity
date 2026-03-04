@@ -1,65 +1,58 @@
 {% extends "base.html" %}
 {% block title %}Upload — Full Capacity{% endblock %}
 
-{% block body %}
-<div class="flex h-screen overflow-hidden">
-    {% include 'components/sidebar.html' %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-semibold text-neutral-950 tracking-tight mb-1">Upload Documents</h1>
+    <p class="text-sm text-neutral-500 mb-8">Drag and drop files or click to browse. Supported: PDF, JPG, PNG, DOCX.</p>
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        {% include 'components/topbar.html' %}
+    <!-- Drop zone -->
+    <div id="drop-zone"
+        class="drop-zone border-2 border-dashed border-neutral-300 rounded-xl p-12 text-center cursor-pointer hover:border-neutral-500 transition-colors">
+        <div class="mb-4">
+            <i data-lucide="upload-cloud" class="w-12 h-12 text-neutral-400 mx-auto"></i>
+        </div>
+        <p class="text-neutral-700 font-medium">Drop files here or click to browse</p>
+        <p class="text-neutral-400 text-sm mt-1">PDF, JPG, PNG, DOCX -- up to 50MB per file</p>
+        <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp,.docx,.doc" class="hidden">
+    </div>
 
-        <main class="flex-1 overflow-y-auto p-6 fade-in">
-            <div class="max-w-2xl mx-auto">
-                <h1 class="text-2xl font-semibold text-neutral-950 tracking-tight mb-1">Upload Documents</h1>
-                <p class="text-sm text-neutral-500 mb-8">Drag and drop files or click to browse. Supported: PDF, JPG, PNG, DOCX.</p>
+    <!-- File list -->
+    <div id="file-list" class="mt-6 space-y-2"></div>
 
-                <!-- Drop zone -->
-                <div id="drop-zone"
-                    class="drop-zone border-2 border-dashed border-neutral-300 rounded-xl p-12 text-center cursor-pointer hover:border-neutral-500 transition-colors">
-                    <div class="mb-4">
-                        <i data-lucide="upload-cloud" class="w-12 h-12 text-neutral-400 mx-auto"></i>
-                    </div>
-                    <p class="text-neutral-700 font-medium">Drop files here or click to browse</p>
-                    <p class="text-neutral-400 text-sm mt-1">PDF, JPG, PNG, DOCX -- up to 50MB per file</p>
-                    <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp,.docx,.doc" class="hidden">
-                </div>
-
-                <!-- File list -->
-                <div id="file-list" class="mt-6 space-y-2"></div>
-
-                <!-- Upload button -->
-                <div id="upload-actions" class="mt-6 hidden">
-                    <button id="upload-btn" onclick="uploadFiles()"
-                        class="bg-neutral-950 hover:bg-neutral-800 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-                        Upload & Process
-                    </button>
-                </div>
-
-                <!-- Results -->
-                <div id="upload-results" class="mt-8 hidden">
-                    <h2 class="text-lg font-semibold text-neutral-950 mb-4">Processing Results</h2>
-                    <div id="results-list" class="space-y-3"></div>
-                    <div class="mt-6 flex gap-3">
-                        <button onclick="resetUpload()" class="bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Upload More
-                        </button>
-                        <a href="/dashboard" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Go to Dashboard
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Duplicate resolution modal -->
-                <div id="duplicate-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
-                    <div class="absolute inset-0 bg-black/60" onclick="closeDuplicateModal()"></div>
-                    <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-                        <h3 id="dup-modal-title" class="text-lg font-semibold text-neutral-950 mb-2"></h3>
-                        <p id="dup-modal-message" class="text-sm text-neutral-600 mb-6"></p>
-                        <div id="dup-modal-actions" class="flex flex-wrap gap-3"></div>
-                    </div>
-                </div>
+    <!-- Upload button -->
+    <div id="upload-actions" class="mt-6 hidden">
+        <button id="upload-btn" onclick="uploadFiles()"
+            class="bg-neutral-950 hover:bg-neutral-800 text-white px-6 py-3 rounded-lg font-medium transition-colors inline-flex items-center gap-2">
+            <span id="upload-btn-text">Upload & Process</span>
+            <div id="upload-btn-spinner" class="hidden luma-spinner text-white" style="width:20px;">
+                <span></span><span></span>
             </div>
-        </main>
+        </button>
+    </div>
+
+    <!-- Results -->
+    <div id="upload-results" class="mt-8 hidden">
+        <h2 class="text-lg font-semibold text-neutral-950 mb-4">Processing Results</h2>
+        <div id="results-list" class="space-y-3"></div>
+        <div class="mt-6 flex gap-3">
+            <button onclick="resetUpload()" class="bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                Upload More
+            </button>
+            <a href="/dashboard" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                Go to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Duplicate resolution modal -->
+    <div id="duplicate-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60" onclick="closeDuplicateModal()"></div>
+        <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 id="dup-modal-title" class="text-lg font-semibold text-neutral-950 mb-2"></h3>
+            <p id="dup-modal-message" class="text-sm text-neutral-600 mb-6"></p>
+            <div id="dup-modal-actions" class="flex flex-wrap gap-3"></div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -76,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
     const topAvatar = document.getElementById('topbar-avatar');
     if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Upload';
     setActiveNav('nav-upload');
     lucide.createIcons();
 });
@@ -127,16 +121,19 @@ function formatSize(bytes) {
 async function uploadFiles() {
     if (selectedFiles.length === 0) return;
     const btn = document.getElementById('upload-btn');
+    const btnText = document.getElementById('upload-btn-text');
+    const btnSpinner = document.getElementById('upload-btn-spinner');
     btn.disabled = true;
-    btn.textContent = 'Uploading...';
+    btnText.textContent = 'Uploading...';
+    btnSpinner.classList.remove('hidden');
     const formData = new FormData();
     for (const file of selectedFiles) formData.append('files', file);
     try {
         const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
         const data = await res.json();
-        if (!res.ok) { alert('Upload failed: ' + (data.detail || 'Unknown error')); btn.disabled = false; btn.textContent = 'Upload & Process'; return; }
+        if (!res.ok) { alert('Upload failed: ' + (data.detail || 'Unknown error')); btn.disabled = false; btnText.textContent = 'Upload & Process'; btnSpinner.classList.add('hidden'); return; }
         showResults(data.results);
-    } catch (err) { alert('Upload failed: ' + err.message); btn.disabled = false; btn.textContent = 'Upload & Process'; }
+    } catch (err) { alert('Upload failed: ' + err.message); btn.disabled = false; btnText.textContent = 'Upload & Process'; btnSpinner.classList.add('hidden'); }
 }
 
 let pendingDuplicates = [];
@@ -250,8 +247,11 @@ function resetUpload() {
     document.getElementById('upload-actions').classList.add('hidden');
     document.getElementById('duplicate-modal').classList.add('hidden');
     const btn = document.getElementById('upload-btn');
+    const btnText = document.getElementById('upload-btn-text');
+    const btnSpinner = document.getElementById('upload-btn-spinner');
     btn.disabled = false;
-    btn.textContent = 'Upload & Process';
+    btnText.textContent = 'Upload & Process';
+    btnSpinner.classList.add('hidden');
 }
 </script>
 {% endblock %}

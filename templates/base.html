@@ -18,16 +18,33 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     {% block head %}{% endblock %}
     <style>
+        /* Sidebar transition */
         .sidebar-transition { transition: width 300ms ease-in-out; }
+
+        /* Nav label fade */
+        .nav-label-transition { transition: opacity 200ms ease; }
+
+        /* Card hover */
         .card-hover { transition: all 200ms ease; }
         .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: #d4d4d4; }
-        @keyframes slideDown {
-            from { transform: translateY(-100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+
+        /* Alert animations */
+        @keyframes alertIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .alert-animate { animation: slideDown 300ms ease-out forwards; }
+        @keyframes alertOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+        .alert-enter { animation: alertIn 300ms ease-out forwards; }
+        .alert-exit { animation: alertOut 200ms ease-in forwards; }
+
+        /* File tree expand */
         .tree-children { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 250ms ease, opacity 200ms ease; }
         .tree-children.expanded { max-height: 2000px; opacity: 1; }
+
+        /* Active nav tubelight glow */
         .nav-active { position: relative; background: #171717; }
         .nav-active::before {
             content: '';
@@ -37,19 +54,147 @@
             border-radius: 0 2px 2px 0;
             box-shadow: 0 0 8px rgba(255,255,255,0.3), 0 0 20px rgba(255,255,255,0.1);
         }
+
+        /* Luma spinner */
+        @keyframes lumaLoader {
+            0%     { inset: 0 35px 35px 0; }
+            12.5%  { inset: 0 35px 0 0; }
+            25%    { inset: 35px 35px 0 0; }
+            37.5%  { inset: 35px 0 0 0; }
+            50%    { inset: 35px 0 0 35px; }
+            62.5%  { inset: 0 0 0 35px; }
+            75%    { inset: 0 0 35px 35px; }
+            87.5%  { inset: 0 0 35px 0; }
+            100%   { inset: 0 35px 35px 0; }
+        }
+        .luma-spinner { position: relative; aspect-ratio: 1; }
+        .luma-spinner span {
+            position: absolute;
+            border-radius: 8px;
+            box-shadow: inset 0 0 0 2px currentColor;
+            animation: lumaLoader 2.5s infinite;
+        }
+        .luma-spinner span:nth-child(2) { animation-delay: -1.25s; }
+
+        /* Bouncing dots */
+        @keyframes dotBounce {
+            0%, 100% { transform: translateY(0); opacity: 0.4; }
+            50% { transform: translateY(-4px); opacity: 1; }
+        }
+        .dot-1 { animation: dotBounce 1.2s ease-in-out infinite; }
+        .dot-2 { animation: dotBounce 1.2s ease-in-out infinite 0.15s; }
+        .dot-3 { animation: dotBounce 1.2s ease-in-out infinite 0.3s; }
+
+        /* Legacy spinner */
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner { animation: spin 1s linear infinite; }
+
+        /* Page fade in */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 300ms ease-out forwards; }
+
+        /* Search dropdown */
+        .search-dropdown { transition: opacity 200ms ease, transform 200ms ease; transform-origin: top; }
+        .search-dropdown-hidden { opacity: 0; transform: scaleY(0.95); pointer-events: none; }
+        .search-dropdown-visible { opacity: 1; transform: scaleY(1); pointer-events: auto; }
+        .search-result-item { opacity: 0; transform: translateY(8px); animation: fadeIn 200ms ease-out forwards; }
+
+        /* Search icon swap */
+        .icon-swap { transition: opacity 200ms ease, transform 200ms ease; }
+        .icon-swap-out { opacity: 0; transform: translateY(8px); }
+        .icon-swap-in { opacity: 1; transform: translateY(0); }
+
+        /* Chevron rotation for tree */
         .chevron-open { transform: rotate(90deg); }
         .chevron-closed { transform: rotate(0deg); }
         .chevron-transition { transition: transform 200ms ease; }
+
+        /* Drop zone drag */
         .drop-zone.dragover { border-color: #0a0a0a; background-color: #f5f5f5; }
+
+        /* Bento hover CTA reveal */
+        .bento-card { position: relative; overflow: hidden; }
+        .bento-content { transition: transform 300ms ease; }
+        .bento-card:hover .bento-content { transform: translateY(-8px); }
+        .bento-cta {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: 0.75rem 1.5rem;
+            transform: translateY(100%); opacity: 0;
+            transition: transform 300ms ease, opacity 300ms ease;
+        }
+        .bento-card:hover .bento-cta { transform: translateY(0); opacity: 1; }
+        .bento-overlay {
+            position: absolute; inset: 0;
+            background: rgba(0,0,0,0); transition: background 300ms ease;
+            pointer-events: none; border-radius: 0.75rem;
+        }
+        .bento-card:hover .bento-overlay { background: rgba(0,0,0,0.02); }
+
+        /* Stacked cards */
+        .stack-container { display: grid; }
+        .stack-container > * { grid-area: 1 / 1; }
+        .stack-card { transform-origin: center; transition: all 500ms ease; }
+        .stack-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: rgba(0,0,0,0.3); border-radius: 0.75rem;
+            transition: opacity 500ms ease;
+        }
+        .stack-card:hover::before { opacity: 0; }
+        .stack-card:hover { transform: translateY(-8px) !important; filter: none !important; }
+
+        /* Status dot pulse */
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .status-dot-pulse { animation: statusPulse 2s ease-in-out infinite; }
     </style>
 </head>
 <body class="bg-neutral-50 font-sans antialiased">
-    {% block body %}{% endblock %}
+    {% block body %}
+    <div class="flex h-screen overflow-hidden">
+        {% include 'components/sidebar.html' %}
+        <div class="flex-1 flex flex-col overflow-hidden">
+            {% include 'components/topbar.html' %}
+            <div id="alert-area" class="px-6 pt-4"></div>
+            <main class="flex-1 overflow-y-auto p-6 fade-in">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% include 'components/chat_widget.html' %}
+    {% endblock %}
     <script src="/static/js/app.js"></script>
+    <script>
+    // Alert banner helper
+    function showAlert(message, type = 'info') {
+        const area = document.getElementById('alert-area');
+        if (!area) return;
+        const colorMap = {
+            success: 'bg-neutral-950 text-white',
+            warning: 'bg-amber-50 text-amber-800 border border-amber-200',
+            error: 'bg-red-50 text-red-800 border border-red-200',
+            info: 'bg-neutral-100 text-neutral-800 border border-neutral-200',
+        };
+        const colors = colorMap[type] || colorMap.info;
+        const el = document.createElement('div');
+        el.className = `flex items-center justify-between gap-3 px-4 py-3 rounded-lg mb-4 alert-enter ${colors}`;
+        el.innerHTML = `<span class="text-sm">${escapeHtml(message)}</span><button onclick="dismissAlert(this)" class="opacity-70 hover:opacity-100 transition-opacity"><i data-lucide="x" class="w-4 h-4"></i></button>`;
+        area.appendChild(el);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        if (type !== 'error') {
+            setTimeout(() => dismissAlert(el.querySelector('button')), 5000);
+        }
+    }
+    function dismissAlert(btn) {
+        const el = btn.closest('.alert-enter');
+        if (!el) return;
+        el.classList.remove('alert-enter');
+        el.classList.add('alert-exit');
+        el.addEventListener('animationend', () => el.remove());
+    }
+    </script>
     {% block scripts %}{% endblock %}
+    <script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
 </body>
 </html>

@@ -36,6 +36,14 @@
         color: #737373;
         overflow: hidden;
     }
+    /* Auto-resize textarea */
+    #chat-textarea {
+        min-height: 40px;
+        max-height: 120px;
+        resize: none;
+        overflow-y: auto;
+        field-sizing: content;
+    }
 </style>
 <div id="chat-widget" class="fixed bottom-5 right-5 z-50">
     <!-- Chat Toggle Button -->
@@ -76,13 +84,15 @@
         </div>
 
         <!-- Input -->
-        <div class="border-t border-neutral-200 px-3 py-3 flex gap-2 flex-shrink-0">
-            <input type="text" id="chat-input" placeholder="Ask about your documents..."
-                class="flex-1 px-3 py-2 bg-neutral-50 border-none rounded-lg text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 transition-colors"
-                onkeydown="if(event.key==='Enter')sendChatMessage()">
-            <button onclick="sendChatMessage()"
-                class="bg-neutral-950 text-white px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm">
-                Send
+        <div class="border-t border-neutral-200 px-3 py-3 flex items-end gap-2 flex-shrink-0">
+            <textarea id="chat-textarea" rows="1" placeholder="Ask about your documents..."
+                class="flex-1 px-3 py-2 bg-neutral-50 border-none rounded-lg text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 transition-colors leading-5"></textarea>
+            <button id="chat-send-btn" onclick="sendChatMessage()"
+                class="bg-neutral-200 text-neutral-400 cursor-not-allowed px-3 py-2 rounded-lg transition-all duration-200 text-sm flex-shrink-0 flex items-center justify-center min-w-[60px] h-[40px]">
+                <span id="chat-send-text">Send</span>
+                <div id="chat-send-spinner" class="hidden luma-spinner text-white" style="width:20px;">
+                    <span></span><span></span>
+                </div>
             </button>
         </div>
     </div>
@@ -124,6 +134,7 @@ function restoreChatMessages() {
 }
 
 let chatExpanded = false;
+let chatSending = false;
 
 function toggleChat() {
     const panel = document.getElementById('chat-panel');
@@ -134,7 +145,7 @@ function toggleChat() {
     iconOpen.classList.toggle('hidden', isHidden);
     iconClose.classList.toggle('hidden', !isHidden);
     if (isHidden) {
-        document.getElementById('chat-input').focus();
+        document.getElementById('chat-textarea').focus();
         const messagesDiv = document.getElementById('chat-messages');
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
@@ -147,6 +158,40 @@ function toggleChatExpand() {
     panel.classList.toggle('expanded', chatExpanded);
     btn.innerHTML = chatExpanded ? '&#x2921;' : '&#x2922;';
     btn.title = chatExpanded ? 'Collapse' : 'Expand';
+}
+
+// Auto-resize textarea
+function initChatTextarea() {
+    const textarea = document.getElementById('chat-textarea');
+    const sendBtn = document.getElementById('chat-send-btn');
+    if (!textarea) return;
+
+    textarea.addEventListener('input', () => {
+        // Auto-resize
+        textarea.style.height = '40px';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        // Update send button state
+        updateSendButtonState();
+    });
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+}
+
+function updateSendButtonState() {
+    const textarea = document.getElementById('chat-textarea');
+    const sendBtn = document.getElementById('chat-send-btn');
+    const hasText = textarea.value.trim().length > 0;
+    if (chatSending) return; // Don't change state while sending
+    if (hasText) {
+        sendBtn.className = 'bg-neutral-950 text-white cursor-pointer px-3 py-2 rounded-lg transition-all duration-200 text-sm flex-shrink-0 flex items-center justify-center min-w-[60px] h-[40px] hover:bg-neutral-800';
+    } else {
+        sendBtn.className = 'bg-neutral-200 text-neutral-400 cursor-not-allowed px-3 py-2 rounded-lg transition-all duration-200 text-sm flex-shrink-0 flex items-center justify-center min-w-[60px] h-[40px]';
+    }
 }
 
 function formatChatResponse(raw) {
@@ -181,18 +226,41 @@ function formatChatResponse(raw) {
     return html;
 }
 
+function createBouncingDots() {
+    return `<div class="flex items-center gap-1 px-1 py-1">
+        <div class="w-1.5 h-1.5 bg-neutral-400 rounded-full dot-1"></div>
+        <div class="w-1.5 h-1.5 bg-neutral-400 rounded-full dot-2"></div>
+        <div class="w-1.5 h-1.5 bg-neutral-400 rounded-full dot-3"></div>
+    </div>`;
+}
+
 async function sendChatMessage() {
-    const input = document.getElementById('chat-input');
-    const query = input.value.trim();
-    if (!query) return;
+    const textarea = document.getElementById('chat-textarea');
+    const sendBtn = document.getElementById('chat-send-btn');
+    const sendText = document.getElementById('chat-send-text');
+    const sendSpinner = document.getElementById('chat-send-spinner');
+    const query = textarea.value.trim();
+    if (!query || chatSending) return;
+
     const messagesDiv = document.getElementById('chat-messages');
     messagesDiv.innerHTML += `<div class="flex justify-end"><div class="chat-msg-user bg-neutral-950 text-white rounded-lg px-3 py-2 max-w-[80%] text-sm">${escapeHtml(query)}</div></div>`;
-    input.value = '';
+    textarea.value = '';
+    textarea.style.height = '40px';
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
     saveChatMessages();
+
+    // Set sending state
+    chatSending = true;
+    sendBtn.className = 'bg-neutral-950 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm flex-shrink-0 flex items-center justify-center min-w-[60px] h-[40px] cursor-wait';
+    sendText.classList.add('hidden');
+    sendSpinner.classList.remove('hidden');
+    textarea.disabled = true;
+
+    // Bouncing dots indicator
     const loadingId = 'loading-' + Date.now();
-    messagesDiv.innerHTML += `<div id="${loadingId}" class="flex justify-start"><div class="bg-neutral-100 rounded-lg px-3 py-2 text-sm text-neutral-400">Thinking...</div></div>`;
+    messagesDiv.innerHTML += `<div id="${loadingId}" class="flex justify-start"><div class="bg-neutral-100 rounded-lg px-3 py-2 text-sm text-neutral-400">${createBouncingDots()}</div></div>`;
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
     try {
         const res = await fetch('/api/chat/query', {
             method: 'POST',
@@ -213,9 +281,21 @@ async function sendChatMessage() {
         if (loadingEl) loadingEl.remove();
         messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 border border-red-200 rounded-lg px-3 py-2 max-w-[80%] text-sm">Connection error. Please try again.</div></div>`;
     }
+
+    // Reset sending state
+    chatSending = false;
+    sendText.classList.remove('hidden');
+    sendSpinner.classList.add('hidden');
+    textarea.disabled = false;
+    textarea.focus();
+    updateSendButtonState();
+
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
     saveChatMessages();
 }
 
-document.addEventListener('DOMContentLoaded', restoreChatMessages);
+document.addEventListener('DOMContentLoaded', () => {
+    restoreChatMessages();
+    initChatTextarea();
+});
 </script>

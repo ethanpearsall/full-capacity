@@ -1,97 +1,148 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Full Capacity{% endblock %}
 
-{% block body %}
-<div class="flex h-screen overflow-hidden">
-    {% include 'components/sidebar.html' %}
+{% block content %}
+<!-- Stats row — bento cards with hover CTA reveal -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Total Documents</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-total">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1" id="stat-total-sub"></p>
+        </div>
+        <div class="bento-cta">
+            <a href="#documents-section" onclick="document.getElementById('documents-section').scrollIntoView({behavior:'smooth'}); return false;" class="text-sm text-neutral-500 hover:text-neutral-950 transition-colors">View all</a>
+        </div>
+    </div>
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="clock" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Processed Today</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-today">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Documents uploaded today</p>
+        </div>
+        <div class="bento-cta">
+            <a href="#" onclick="filterToday(); return false;" class="text-sm text-neutral-500 hover:text-neutral-950 transition-colors">View today's</a>
+        </div>
+    </div>
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="check-circle" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Auto-Filed</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-filed">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Filed by AI automatically</p>
+        </div>
+        <div class="bento-cta">
+            <a href="#" onclick="filterStatus('filed'); return false;" class="text-sm text-neutral-500 hover:text-neutral-950 transition-colors">View filed</a>
+        </div>
+    </div>
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="gauge" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Avg Confidence</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-confidence">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Classification accuracy</p>
+        </div>
+        <div class="bento-cta">
+            <a href="/upload" class="text-sm text-neutral-500 hover:text-neutral-950 transition-colors">Upload</a>
+        </div>
+    </div>
+</div>
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        {% include 'components/topbar.html' %}
+<!-- Two-column layout: documents table + right panel -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Documents table (col-span-2) -->
+    <div class="lg:col-span-2" id="documents-section">
+        <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+            <!-- Table header -->
+            <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-neutral-950">Documents</h2>
+                <a href="/upload" class="bg-neutral-950 text-white px-4 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium inline-flex items-center gap-2">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    Upload
+                </a>
+            </div>
 
-        <!-- Alert area -->
-        <div id="alert-area" class="px-6 pt-4"></div>
-
-        <!-- Main content -->
-        <main class="flex-1 overflow-y-auto p-6 fade-in">
-            <!-- Stats row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
-                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Total Documents</span>
-                    </div>
-                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-total">&mdash;</p>
-                </div>
-                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="clock" class="w-4 h-4 text-neutral-400"></i>
-                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Processed Today</span>
-                    </div>
-                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-today">&mdash;</p>
-                </div>
-                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="check-circle" class="w-4 h-4 text-neutral-400"></i>
-                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Auto-Filed</span>
-                    </div>
-                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-filed">&mdash;</p>
-                </div>
-                <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-neutral-400"></i>
-                        <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Document Types</span>
-                    </div>
-                    <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-types">&mdash;</p>
+            <!-- Filter bar -->
+            <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-100 flex items-center gap-3">
+                <div class="relative flex-1 max-w-xs">
+                    <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+                    <input type="text" id="search-input" placeholder="Search..."
+                        class="w-full h-8 text-xs rounded-md border border-neutral-200 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
                 </div>
             </div>
 
-            <!-- Documents table -->
-            <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
-                <!-- Table header -->
-                <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold text-neutral-950">Documents</h2>
-                    <a href="/upload" class="bg-neutral-950 text-white px-4 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium">Upload</a>
-                </div>
-
-                <!-- Filter bar -->
-                <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-100 flex items-center gap-3">
-                    <div class="relative flex-1 max-w-xs">
-                        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
-                        <input type="text" id="search-input" placeholder="Search..."
-                            class="w-full h-8 text-xs rounded-md border border-neutral-200 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
-                    </div>
-                </div>
-
-                <!-- Table -->
+            <!-- Table -->
+            <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-neutral-50">
                         <tr>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Document Name</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Document</th>
                             <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Type</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Client</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Date</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Confidence</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden md:table-cell">Date</th>
+                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden lg:table-cell">Confidence</th>
                             <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Status</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left"></th>
                         </tr>
                     </thead>
                     <tbody id="documents-table">
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-neutral-400 text-sm">Loading documents...</td>
+                            <td colspan="5" class="px-6 py-12 text-center">
+                                <div class="luma-spinner text-neutral-300 mx-auto" style="width:40px;"><span></span><span></span></div>
+                                <p class="text-neutral-400 text-sm mt-4">Loading documents...</p>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-        </main>
+
+            <!-- Pagination -->
+            <div class="px-6 py-4 border-t border-neutral-100 flex items-center justify-between">
+                <span class="text-xs text-neutral-500" id="table-count"></span>
+                <div class="flex gap-2">
+                    <button onclick="prevPage()" id="btn-prev" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Prev</button>
+                    <button onclick="nextPage()" id="btn-next" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="space-y-6">
+        <!-- Stacked display cards -->
+        <div>
+            <h3 class="text-sm font-semibold text-neutral-950 mb-3">Recent Uploads</h3>
+            <div class="stack-container h-48" id="stacked-cards">
+                <div class="text-center py-8 text-neutral-400 text-xs">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Activity feed -->
+        <div>
+            <h3 class="text-sm font-semibold text-neutral-950 mb-3">Recent Activity</h3>
+            <div class="bg-neutral-50 border border-neutral-200 rounded-xl p-4 space-y-3" id="activity-feed">
+                <div class="text-center py-4 text-neutral-400 text-xs">Loading...</div>
+            </div>
+        </div>
     </div>
 </div>
-
-{% include 'components/chat_widget.html' %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Set sidebar user info and active nav
+// Page init
 document.addEventListener('DOMContentLoaded', () => {
     const email = '{{ user.get("email", "") }}';
     const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
@@ -101,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
     const topAvatar = document.getElementById('topbar-avatar');
     if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Dashboard';
     setActiveNav('nav-dashboard');
     loadStats();
     loadDocuments();
@@ -111,68 +163,124 @@ document.getElementById('search-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') searchDocuments();
 });
 
-// Global search from topbar
-const globalSearch = document.getElementById('global-search-input');
-if (globalSearch) {
-    globalSearch.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('search-input').value = globalSearch.value;
-            searchDocuments();
-        }
-    });
-}
-
+// Stats
 async function loadStats() {
     try {
         const res = await fetch('/api/documents/stats');
         if (!res.ok) return;
         const data = await res.json();
         document.getElementById('stat-total').textContent = data.total_documents;
+        document.getElementById('stat-total-sub').textContent = Object.keys(data.by_type || {}).length + ' document types';
         document.getElementById('stat-today').textContent = data.processed_today;
         document.getElementById('stat-filed').textContent = data.by_status?.filed || 0;
-        document.getElementById('stat-types').textContent = Object.keys(data.by_type).length;
+        // Compute avg confidence from loaded docs later
     } catch (err) {
         console.error('Failed to load stats:', err);
     }
 }
+
+// Documents
+let allDocs = [];
+let currentPage = 0;
+const PAGE_SIZE = 20;
 
 async function loadDocuments(params = '') {
     try {
         const res = await fetch('/api/documents' + params);
         if (!res.ok) return;
         const data = await res.json();
-        renderDocuments(data.documents);
+        allDocs = data.documents || [];
+        currentPage = 0;
+        renderPage();
+        renderStackedCards(allDocs.slice(0, 3));
+        renderActivityFeed(allDocs.slice(0, 5));
+        computeAvgConfidence(allDocs);
     } catch (err) {
         console.error('Failed to load documents:', err);
     }
 }
 
+function computeAvgConfidence(docs) {
+    const scored = docs.filter(d => d.confidence_score != null);
+    if (scored.length === 0) {
+        document.getElementById('stat-confidence').textContent = '\u2014';
+        return;
+    }
+    const avg = scored.reduce((s, d) => s + d.confidence_score, 0) / scored.length;
+    const el = document.getElementById('stat-confidence');
+    const pct = (avg * 100).toFixed(1);
+    el.textContent = pct + '%';
+    if (avg >= 0.9) el.className = 'text-3xl font-bold text-neutral-950 tabular-nums';
+    else if (avg >= 0.7) el.className = 'text-3xl font-bold text-neutral-500 tabular-nums';
+    else el.className = 'text-3xl font-bold text-red-600 tabular-nums';
+}
+
+function renderPage() {
+    const start = currentPage * PAGE_SIZE;
+    const page = allDocs.slice(start, start + PAGE_SIZE);
+    renderDocuments(page);
+    const total = allDocs.length;
+    const showing = page.length;
+    document.getElementById('table-count').textContent = total > 0 ? `Showing ${start + 1}-${start + showing} of ${total} documents` : '';
+    document.getElementById('btn-prev').classList.toggle('hidden', currentPage === 0);
+    document.getElementById('btn-next').classList.toggle('hidden', start + PAGE_SIZE >= total);
+}
+
+function prevPage() { if (currentPage > 0) { currentPage--; renderPage(); } }
+function nextPage() { if ((currentPage + 1) * PAGE_SIZE < allDocs.length) { currentPage++; renderPage(); } }
+
+// Document type icon mapping
+function getDocTypeIcon(type) {
+    const map = {
+        invoice: 'receipt', receipt: 'receipt',
+        contract: 'file-check', agreement: 'file-check',
+        engagement_letter: 'mail', advice_letter: 'mail', letter: 'mail',
+        court_filing: 'scale', compliance_report: 'shield-check',
+        tax_return: 'calculator', financial_statement: 'bar-chart-2',
+        report: 'bar-chart-2', memorandum: 'file-text', memo: 'file-text',
+    };
+    return map[type] || 'file-text';
+}
+
+function getStatusDot(status) {
+    if (status === 'filed') return '<div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-neutral-950 ring-2 ring-white"></div>';
+    if (status === 'processing' || status === 'classified') return '<div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-neutral-300 ring-2 ring-white status-dot-pulse"></div>';
+    if (status === 'error') return '<div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white"></div>';
+    return '<div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-neutral-300 ring-2 ring-white"></div>';
+}
+
 function renderDocuments(docs) {
     const tbody = document.getElementById('documents-table');
     if (!docs || docs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center">
+        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center">
             <i data-lucide="file-x" class="w-16 h-16 text-neutral-300 mx-auto mb-3"></i>
-            <p class="text-neutral-500 text-sm">No documents found.</p>
+            <p class="text-neutral-500 text-sm">No documents found</p>
             <a href="/upload" class="text-neutral-950 hover:underline text-sm font-medium">Upload your first document</a>
         </td></tr>`;
         lucide.createIcons();
         return;
     }
 
+    const statusMap = {
+        filed: 'bg-neutral-900 text-white',
+        processing: 'bg-neutral-200 text-neutral-700',
+        classified: 'bg-neutral-200 text-neutral-700',
+        error: 'bg-red-50 text-red-700 border border-red-200',
+        duplicate: 'bg-amber-50 text-amber-700 border border-amber-200',
+        duplicate_exact: 'bg-amber-50 text-amber-700 border border-amber-200',
+        duplicate_name: 'bg-amber-50 text-amber-700 border border-amber-200',
+        duplicate_content: 'bg-amber-50 text-amber-700 border border-amber-200',
+    };
+
     tbody.innerHTML = docs.map(doc => {
-        const statusMap = {
-            filed: 'bg-neutral-900 text-white',
-            processing: 'bg-neutral-200 text-neutral-700',
-            classified: 'bg-neutral-200 text-neutral-700',
-            error: 'bg-red-50 text-red-700 border border-red-200',
-            duplicate: 'bg-amber-50 text-amber-700 border border-amber-200',
-            duplicate_exact: 'bg-amber-50 text-amber-700 border border-amber-200',
-            duplicate_name: 'bg-amber-50 text-amber-700 border border-amber-200',
-            duplicate_content: 'bg-amber-50 text-amber-700 border border-amber-200',
-        };
         const statusClass = statusMap[doc.status] || 'bg-neutral-100 text-neutral-600';
         const docDate = doc.document_date || '\u2014';
         const docType = doc.document_type ? doc.document_type.replace(/_/g, ' ') : '\u2014';
+        const docName = doc.filed_name || doc.original_filename;
+        const client = doc.client_name || '';
+        const typeIcon = getDocTypeIcon(doc.document_type || '');
+        const statusDot = getStatusDot(doc.status);
+        const breadcrumb = [client, docType !== '\u2014' ? docType : ''].filter(Boolean).join(' > ');
 
         let confHtml = '\u2014';
         if (doc.confidence_score != null) {
@@ -184,19 +292,109 @@ function renderDocuments(docs) {
         }
 
         return `<tr class="border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer transition-colors" onclick="window.location='/document/${doc.id}'">
-            <td class="px-6 py-4 text-sm font-medium text-neutral-950 max-w-xs truncate">${escapeHtml(doc.filed_name || doc.original_filename)}</td>
-            <td class="px-6 py-4"><span class="border border-neutral-300 text-neutral-600 bg-neutral-50 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize">${escapeHtml(docType)}</span></td>
-            <td class="px-6 py-4 text-sm text-neutral-600">${escapeHtml(doc.client_name || '\u2014')}</td>
-            <td class="px-6 py-4 text-sm text-neutral-500">${escapeHtml(docDate)}</td>
-            <td class="px-6 py-4 text-sm">${confHtml}</td>
-            <td class="px-6 py-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${doc.status}</span></td>
-            <td class="px-6 py-4 text-right">
-                <a href="/api/documents/${doc.id}/download" class="text-neutral-500 hover:text-neutral-950 text-sm transition-colors" onclick="event.stopPropagation()">Download</a>
+            <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                    <div class="relative flex-shrink-0">
+                        <div class="w-6 h-6 bg-neutral-100 rounded flex items-center justify-center">
+                            <i data-lucide="${typeIcon}" class="w-3.5 h-3.5 text-neutral-500"></i>
+                        </div>
+                        ${statusDot}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="font-medium text-neutral-950 text-sm truncate max-w-[200px]">${escapeHtml(docName)}</p>
+                        ${breadcrumb ? `<p class="text-xs text-neutral-400 truncate max-w-[200px]">${escapeHtml(breadcrumb)}</p>` : ''}
+                    </div>
+                </div>
             </td>
+            <td class="px-6 py-4"><span class="border border-neutral-300 text-neutral-600 bg-neutral-50 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize">${escapeHtml(docType)}</span></td>
+            <td class="px-6 py-4 text-sm text-neutral-500 hidden md:table-cell">${escapeHtml(docDate)}</td>
+            <td class="px-6 py-4 text-sm hidden lg:table-cell">${confHtml}</td>
+            <td class="px-6 py-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${doc.status}</span></td>
         </tr>`;
+    }).join('');
+    lucide.createIcons();
+}
+
+// Stacked display cards
+function renderStackedCards(docs) {
+    const container = document.getElementById('stacked-cards');
+    if (!docs || docs.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-neutral-400 text-xs">No recent uploads</div>';
+        return;
+    }
+    const cards = docs.slice(0, 3).map((doc, i) => {
+        const name = doc.filed_name || doc.original_filename || 'Untitled';
+        const docType = (doc.document_type || '').replace(/_/g, ' ');
+        const time = doc.uploaded_at ? timeAgo(doc.uploaded_at) : '';
+        const offset = i * 16;
+        const yOffset = i * 8;
+        const isTop = i === docs.slice(0, 3).length - 1;
+        const filter = isTop ? '' : `filter: brightness(${0.7 + i * 0.1})`;
+        const zIndex = i + 1;
+        return `<div class="stack-card bg-neutral-900 text-white border border-neutral-800 rounded-xl p-4 cursor-pointer"
+                     style="transform: translateX(${offset}px) translateY(${yOffset}px) skewY(-4deg); z-index: ${zIndex}; ${filter}"
+                     onclick="window.location='/document/${doc.id}'">
+            <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="file-text" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium truncate">${escapeHtml(name)}</span>
+            </div>
+            <p class="text-xs text-neutral-500">${escapeHtml(docType)}</p>
+            ${time ? `<p class="text-xs text-neutral-600 mt-1">${time}</p>` : ''}
+        </div>`;
+    }).join('');
+    container.innerHTML = cards;
+    lucide.createIcons();
+}
+
+// Activity feed
+function renderActivityFeed(docs) {
+    const container = document.getElementById('activity-feed');
+    if (!docs || docs.length === 0) {
+        container.innerHTML = '<div class="text-center py-4 text-neutral-400 text-xs">No recent activity</div>';
+        return;
+    }
+    container.innerHTML = docs.map(doc => {
+        const name = doc.filed_name || doc.original_filename || 'Untitled';
+        const docType = (doc.document_type || '').replace(/_/g, ' ');
+        const time = doc.uploaded_at ? timeAgo(doc.uploaded_at) : '';
+        const statusLabel = doc.status === 'filed' ? 'Auto-filed' : doc.status === 'error' ? 'Error' : doc.status === 'processing' ? 'Processing' : 'Uploaded';
+        const client = doc.client_name || '';
+        const folderPath = doc.folder_path || '';
+        let desc = `${name}`;
+        if (doc.status === 'filed' && folderPath) {
+            desc += ` filed to ${folderPath}`;
+        } else if (doc.status === 'error') {
+            desc += ` failed processing`;
+        }
+        const initial = name.charAt(0).toUpperCase();
+        const dotColor = doc.status === 'filed' ? 'bg-neutral-950' : doc.status === 'error' ? 'bg-red-500' : 'bg-neutral-300';
+
+        return `<div class="flex items-start gap-3">
+            <div class="relative flex-shrink-0">
+                <div class="w-8 h-8 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs font-medium">${initial}</div>
+                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${dotColor} ring-2 ring-neutral-50"></div>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-neutral-700">${escapeHtml(statusLabel)}</p>
+                <p class="text-[13px] text-neutral-500 truncate">${escapeHtml(desc)}</p>
+                ${time ? `<p class="text-[12px] text-neutral-400">${time}</p>` : ''}
+            </div>
+        </div>`;
     }).join('');
 }
 
+function timeAgo(dateStr) {
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+    return then.toLocaleDateString();
+}
+
+// Search & filter
 async function searchDocuments() {
     const q = document.getElementById('search-input').value.trim();
     if (!q) { loadDocuments(); return; }
@@ -204,18 +402,41 @@ async function searchDocuments() {
         const res = await fetch('/api/documents/search?q=' + encodeURIComponent(q));
         if (!res.ok) return;
         const data = await res.json();
-        renderDocuments(data.documents);
+        allDocs = data.documents || [];
+        currentPage = 0;
+        renderPage();
     } catch (err) {
         console.error('Search failed:', err);
     }
 }
 
+function filterToday() {
+    const today = new Date().toISOString().split('T')[0];
+    const filtered = allDocs.filter(d => d.uploaded_at && d.uploaded_at.startsWith(today));
+    currentPage = 0;
+    renderDocuments(filtered);
+    document.getElementById('table-count').textContent = `Showing ${filtered.length} documents from today`;
+    document.getElementById('btn-prev').classList.add('hidden');
+    document.getElementById('btn-next').classList.add('hidden');
+}
+
+function filterStatus(status) {
+    const filtered = allDocs.filter(d => d.status === status);
+    currentPage = 0;
+    renderDocuments(filtered);
+    document.getElementById('table-count').textContent = `Showing ${filtered.length} ${status} documents`;
+    document.getElementById('btn-prev').classList.add('hidden');
+    document.getElementById('btn-next').classList.add('hidden');
+}
+
+// Folder tree
 async function loadFolderTree() {
     try {
         const res = await fetch('/api/folders');
         if (!res.ok) return;
         const data = await res.json();
         const container = document.getElementById('folder-tree');
+        if (!container) return;
         if (!data.tree || Object.keys(data.tree).length === 0) {
             container.innerHTML = '<p class="text-neutral-600 text-xs px-2">No folders yet</p>';
             return;
@@ -255,9 +476,7 @@ function toggleTreeFolder(el) {
     const parent = el.parentElement;
     const children = parent.querySelector('.tree-children');
     const chevron = el.querySelector('[data-lucide="chevron-right"]');
-    if (children) {
-        children.classList.toggle('expanded');
-    }
+    if (children) children.classList.toggle('expanded');
     if (chevron) {
         chevron.classList.toggle('chevron-open');
         chevron.classList.toggle('chevron-closed');
@@ -269,7 +488,9 @@ async function loadFolderDocs(path) {
         const res = await fetch('/api/folders' + path);
         if (!res.ok) return;
         const data = await res.json();
-        renderDocuments(data.documents);
+        allDocs = data.documents || [];
+        currentPage = 0;
+        renderPage();
     } catch (err) {
         console.error('Failed to load folder:', err);
     }

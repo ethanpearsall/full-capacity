@@ -6,17 +6,26 @@
             <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
         <div>
-            <h1 id="page-title" class="text-xl font-semibold text-neutral-950 tracking-tight">{% block page_title %}Dashboard{% endblock %}</h1>
+            <h1 id="page-title" class="text-xl font-semibold text-neutral-950 tracking-tight">Dashboard</h1>
         </div>
     </div>
 
     <!-- Center: search -->
-    <div class="hidden md:flex items-center flex-1 max-w-md mx-8 relative">
+    <div class="hidden md:flex items-center flex-1 max-w-md mx-8 relative" id="search-container">
         <div class="relative w-full">
-            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+            <i data-lucide="search" id="search-icon-search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 icon-swap icon-swap-in"></i>
+            <i data-lucide="arrow-right" id="search-icon-arrow" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-950 icon-swap icon-swap-out hidden"></i>
             <input type="text" id="global-search-input" placeholder="Search documents..."
-                class="w-full bg-neutral-100 rounded-lg pl-10 pr-16 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:bg-white transition-colors">
-            <kbd class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400 bg-neutral-200 rounded px-1.5 py-0.5 font-mono">Ctrl+K</kbd>
+                class="w-full bg-neutral-100 rounded-lg pl-10 pr-16 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:bg-white transition-colors"
+                autocomplete="off">
+            <kbd id="search-kbd" class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400 bg-neutral-200 rounded px-1.5 py-0.5 font-mono">Ctrl+K</kbd>
+        </div>
+        <!-- Search dropdown -->
+        <div id="search-dropdown" class="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl overflow-hidden z-50 search-dropdown search-dropdown-hidden">
+            <div id="search-results" class="max-h-64 overflow-y-auto"></div>
+            <div class="px-3 py-2 border-t border-neutral-100 text-xs text-neutral-400">
+                Press Enter to search -- Esc to close
+            </div>
         </div>
     </div>
 
@@ -27,12 +36,156 @@
 </header>
 
 <script>
-// Ctrl+K shortcut
-document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        const input = document.getElementById('global-search-input');
-        if (input) input.focus();
+(function() {
+    const searchInput = document.getElementById('global-search-input');
+    const dropdown = document.getElementById('search-dropdown');
+    const resultsContainer = document.getElementById('search-results');
+    const iconSearch = document.getElementById('search-icon-search');
+    const iconArrow = document.getElementById('search-icon-arrow');
+    const kbdBadge = document.getElementById('search-kbd');
+    let searchTimer = null;
+    let highlightIndex = -1;
+    let currentResults = [];
+
+    // Ctrl+K / Cmd+K shortcut
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            if (searchInput) searchInput.focus();
+        }
+    });
+
+    if (!searchInput) return;
+
+    // Icon swap on input
+    searchInput.addEventListener('input', () => {
+        const hasText = searchInput.value.trim().length > 0;
+        if (hasText) {
+            iconSearch.classList.add('icon-swap-out', 'hidden');
+            iconSearch.classList.remove('icon-swap-in');
+            iconArrow.classList.remove('icon-swap-out', 'hidden');
+            iconArrow.classList.add('icon-swap-in');
+            kbdBadge.classList.add('hidden');
+        } else {
+            iconArrow.classList.add('icon-swap-out', 'hidden');
+            iconArrow.classList.remove('icon-swap-in');
+            iconSearch.classList.remove('icon-swap-out', 'hidden');
+            iconSearch.classList.add('icon-swap-in');
+            kbdBadge.classList.remove('hidden');
+        }
+        // Debounced search
+        clearTimeout(searchTimer);
+        if (hasText) {
+            searchTimer = setTimeout(() => performSearch(searchInput.value.trim()), 300);
+        } else {
+            closeDropdown();
+        }
+    });
+
+    // Keyboard navigation
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeDropdown();
+            searchInput.blur();
+            return;
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlightIndex = Math.min(highlightIndex + 1, currentResults.length - 1);
+            updateHighlight();
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlightIndex = Math.max(highlightIndex - 1, -1);
+            updateHighlight();
+            return;
+        }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlightIndex >= 0 && currentResults[highlightIndex]) {
+                window.location.href = '/document/' + currentResults[highlightIndex].id;
+            } else if (searchInput.value.trim()) {
+                // Trigger page search if on dashboard
+                const tableSearch = document.getElementById('search-input');
+                if (tableSearch) {
+                    tableSearch.value = searchInput.value;
+                    if (typeof searchDocuments === 'function') searchDocuments();
+                }
+                closeDropdown();
+            }
+            return;
+        }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('search-container').contains(e.target)) {
+            closeDropdown();
+        }
+    });
+
+    async function performSearch(query) {
+        try {
+            const res = await fetch('/api/documents/search?q=' + encodeURIComponent(query));
+            if (!res.ok) return;
+            const data = await res.json();
+            currentResults = (data.documents || []).slice(0, 8);
+            highlightIndex = -1;
+            renderResults();
+            openDropdown();
+        } catch (err) {
+            console.error('Search error:', err);
+        }
     }
-});
+
+    function renderResults() {
+        if (currentResults.length === 0) {
+            resultsContainer.innerHTML = '<div class="px-4 py-6 text-center text-sm text-neutral-400">No results found</div>';
+            return;
+        }
+        resultsContainer.innerHTML = currentResults.map((doc, i) => {
+            const name = doc.filed_name || doc.original_filename || 'Untitled';
+            const docType = (doc.document_type || '').replace(/_/g, ' ');
+            const client = doc.client_name || '';
+            const meta = [docType, client].filter(Boolean).join(' -- ');
+            return `<div class="search-result-item px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-neutral-50 transition-colors border-b border-neutral-50"
+                         style="animation-delay: ${i * 50}ms"
+                         data-index="${i}"
+                         onmouseenter="this.parentNode.querySelectorAll('.search-result-item').forEach(el => el.classList.remove('bg-neutral-100')); this.classList.add('bg-neutral-100')"
+                         onclick="window.location.href='/document/${doc.id}'">
+                <div class="w-6 h-6 bg-neutral-100 rounded flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 text-neutral-400"></i>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-neutral-950 truncate">${escapeHtml(name)}</p>
+                    ${meta ? `<p class="text-xs text-neutral-400 truncate">${escapeHtml(meta)}</p>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function updateHighlight() {
+        const items = resultsContainer.querySelectorAll('.search-result-item');
+        items.forEach((el, i) => {
+            el.classList.toggle('bg-neutral-100', i === highlightIndex);
+        });
+        if (highlightIndex >= 0 && items[highlightIndex]) {
+            items[highlightIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function openDropdown() {
+        dropdown.classList.remove('search-dropdown-hidden');
+        dropdown.classList.add('search-dropdown-visible');
+    }
+
+    function closeDropdown() {
+        dropdown.classList.add('search-dropdown-hidden');
+        dropdown.classList.remove('search-dropdown-visible');
+        highlightIndex = -1;
+        currentResults = [];
+    }
+})();
 </script>
