@@ -94,6 +94,19 @@
             </div>
         </div>
 
+        <!-- Email Source (shown only for email-sourced documents) -->
+        <div id="doc-email-source" class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover hidden">
+            <div class="flex items-center gap-2 mb-4">
+                <i data-lucide="mail" class="w-4 h-4 text-neutral-400"></i>
+                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Email Source</h3>
+            </div>
+            <dl class="space-y-3 text-sm">
+                <div class="flex justify-between"><dt class="text-neutral-500">From</dt><dd id="doc-email-from" class="font-medium text-neutral-950"></dd></div>
+                <div class="flex justify-between"><dt class="text-neutral-500">Subject</dt><dd id="doc-email-subject" class="font-medium text-neutral-950 text-right max-w-[300px] truncate"></dd></div>
+                <div id="doc-email-link-row" class="flex justify-between hidden"><dt class="text-neutral-500">Email Record</dt><dd><a id="doc-email-link" href="#" class="text-sm text-neutral-950 hover:underline font-medium">View Email</a></dd></div>
+            </dl>
+        </div>
+
         <!-- AI Summary -->
         <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
             <div class="flex items-center gap-2 mb-3">
@@ -222,6 +235,18 @@ function renderDocument(doc) {
 
     // Extracted text
     document.getElementById('doc-text').textContent = doc.extracted_text || 'No text extracted.';
+
+    // Email source (if this document came from email ingestion)
+    if (doc.email_from || doc.email_ingestion_id) {
+        const emailSection = document.getElementById('doc-email-source');
+        emailSection.classList.remove('hidden');
+        document.getElementById('doc-email-from').textContent = doc.email_from || '--';
+        document.getElementById('doc-email-subject').textContent = doc.email_subject || '--';
+        if (doc.email_ingestion_id) {
+            document.getElementById('doc-email-link-row').classList.remove('hidden');
+            document.getElementById('doc-email-link').href = '/api/email/page/' + doc.email_ingestion_id;
+        }
+    }
 
     lucide.createIcons();
 }

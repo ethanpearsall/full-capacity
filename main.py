@@ -11,6 +11,7 @@ from app.auth.dependencies import get_current_user
 from app.documents.router import router as documents_router
 from app.dashboard.router import router as dashboard_router
 from app.chat.router import router as chat_router
+from app.email.router import router as email_router
 from app.database import get_supabase_admin
 from app.config import settings
 
@@ -51,7 +52,20 @@ async def lifespan(app: FastAPI):
     else:
         print("[STARTUP] WARNING: ANTHROPIC_API_KEY is empty!", flush=True)
 
+    # Start IMAP polling background task
+    import asyncio
+    from app.email.imap_scheduler import imap_polling_loop
+    polling_task = asyncio.create_task(imap_polling_loop())
+    print("[STARTUP] IMAP polling background task started", flush=True)
+
     yield
+
+    # Cleanup: cancel polling task on shutdown
+    polling_task.cancel()
+    try:
+        await polling_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
@@ -68,6 +82,7 @@ app.include_router(auth_router)
 app.include_router(documents_router)
 app.include_router(dashboard_router)
 app.include_router(chat_router)
+app.include_router(email_router)
 
 
 @app.get("/health")

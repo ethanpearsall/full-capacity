@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Email Detail — Full Capacity{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <!-- Back link -->
+    <a href="/api/email/page" class="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-950 transition-colors mb-6">
+        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+        Back to Email Ingestions
+    </a>
+
+    <!-- Loading state -->
+    <div id="email-loading" class="text-center py-16">
+        <div class="luma-spinner text-neutral-300 mx-auto" style="width:50px;"><span></span><span></span></div>
+        <p class="text-neutral-400 text-sm mt-4">Loading email details...</p>
+    </div>
+
+    <!-- Content -->
+    <div id="email-content" class="hidden">
+        <!-- Header -->
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <h1 id="email-subject" class="text-2xl font-semibold text-neutral-950 tracking-tight"></h1>
+                <p id="email-source-badge" class="text-xs text-neutral-400 mt-1"></p>
+            </div>
+            <div class="flex gap-3">
+                <button id="reprocess-btn" onclick="reprocessEmail()"
+                    class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    Reprocess All
+                </button>
+                <button id="delete-btn" onclick="deleteEmail()"
+                    class="border border-red-200 text-red-600 hover:bg-red-50 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left column (2/3) -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Email Info -->
+                <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="mail" class="w-4 h-4 text-neutral-400"></i>
+                        <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Email Info</h3>
+                    </div>
+                    <dl class="space-y-3 text-sm">
+                        <div class="flex justify-between"><dt class="text-neutral-500">From</dt><dd id="email-from" class="font-medium text-neutral-950 text-right"></dd></div>
+                        <div class="flex justify-between"><dt class="text-neutral-500">To</dt><dd id="email-to" class="font-medium text-neutral-950 text-right"></dd></div>
+                        <div class="flex justify-between"><dt class="text-neutral-500">Subject</dt><dd id="email-subject-field" class="font-medium text-neutral-950 text-right max-w-[300px] truncate"></dd></div>
+                        <div class="flex justify-between"><dt class="text-neutral-500">Received</dt><dd id="email-received" class="font-medium text-neutral-950 text-right"></dd></div>
+                        <div class="flex justify-between"><dt class="text-neutral-500">Source</dt><dd id="email-source" class="font-medium text-neutral-950 text-right"></dd></div>
+                    </dl>
+                    <!-- Body preview -->
+                    <div id="email-body-section" class="mt-4 hidden">
+                        <p class="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Body Preview</p>
+                        <div id="email-body" class="bg-neutral-50 rounded-lg p-4 text-sm text-neutral-600 whitespace-pre-wrap max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- Attachments -->
+                <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="paperclip" class="w-4 h-4 text-neutral-400"></i>
+                        <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Attachments</h3>
+                    </div>
+                    <div id="attachments-list" class="space-y-3">
+                        <p class="text-neutral-400 text-sm">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column (1/3) -->
+            <div class="space-y-6">
+                <!-- Processing Summary -->
+                <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-neutral-400"></i>
+                        <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Processing Summary</h3>
+                    </div>
+                    <dl class="space-y-3 text-sm">
+                        <div class="flex justify-between"><dt class="text-neutral-500">Total attachments</dt><dd id="summary-total" class="font-bold text-neutral-950"></dd></div>
+                        <div class="flex justify-between"><dt class="text-neutral-500">Successfully filed</dt><dd id="summary-filed" class="font-bold text-neutral-950"></dd></div>
+                        <div id="summary-failed-row" class="flex justify-between hidden"><dt class="text-neutral-500">Failed</dt><dd id="summary-failed" class="font-bold text-red-600"></dd></div>
+                        <div id="summary-skipped-row" class="flex justify-between hidden"><dt class="text-neutral-500">Skipped</dt><dd id="summary-skipped" class="font-bold text-neutral-500"></dd></div>
+                    </dl>
+                </div>
+
+                <!-- Status -->
+                <div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="activity" class="w-4 h-4 text-neutral-400"></i>
+                        <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Status</h3>
+                    </div>
+                    <span id="email-status" class="px-3 py-1 rounded-full text-xs font-medium"></span>
+                    <p id="email-error" class="text-sm text-red-600 mt-3 hidden"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ingestionId = '{{ ingestion_id }}';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Email Detail';
+    setActiveNav('nav-email');
+    loadEmailDetail();
+});
+
+async function loadEmailDetail() {
+    try {
+        const res = await fetch('/api/email/ingestions/' + ingestionId);
+        if (!res.ok) {
+            document.getElementById('email-loading').innerHTML = '<p class="text-neutral-400 text-sm">Email not found.</p>';
+            return;
+        }
+        const data = await res.json();
+        renderEmailDetail(data);
+    } catch (err) {
+        document.getElementById('email-loading').innerHTML = '<p class="text-neutral-400 text-sm">Failed to load email.</p>';
+    }
+}
+
+function renderEmailDetail(em) {
+    document.getElementById('email-loading').classList.add('hidden');
+    document.getElementById('email-content').classList.remove('hidden');
+
+    document.getElementById('email-subject').textContent = em.subject || '(No subject)';
+    document.getElementById('email-source-badge').textContent = 'Source: ' + (em.source === 'webhook' ? 'Webhook' : 'IMAP');
+
+    // Info fields
+    const fromDisplay = em.from_name ? em.from_name + ' <' + em.from_address + '>' : em.from_address;
+    document.getElementById('email-from').textContent = fromDisplay;
+    document.getElementById('email-to').textContent = em.to_address || '--';
+    document.getElementById('email-subject-field').textContent = em.subject || '(No subject)';
+    document.getElementById('email-received').textContent = em.received_at ? new Date(em.received_at).toLocaleString() : '--';
+    document.getElementById('email-source').textContent = em.source === 'webhook' ? 'Webhook (SendGrid)' : 'IMAP Polling';
+
+    // Body preview
+    if (em.body_preview) {
+        document.getElementById('email-body-section').classList.remove('hidden');
+        document.getElementById('email-body').textContent = em.body_preview;
+    }
+
+    // Status badge
+    const statusMap = {
+        completed: 'bg-neutral-900 text-white',
+        processing: 'bg-neutral-200 text-neutral-700',
+        failed: 'bg-red-50 text-red-700 border border-red-200',
+        partial: 'bg-amber-50 text-amber-700 border border-amber-200',
+        received: 'bg-neutral-100 text-neutral-500',
+    };
+    const statusEl = document.getElementById('email-status');
+    statusEl.textContent = em.status;
+    statusEl.className = 'px-3 py-1 rounded-full text-xs font-medium ' + (statusMap[em.status] || 'bg-neutral-100 text-neutral-600');
+
+    if (em.error_message) {
+        const errEl = document.getElementById('email-error');
+        errEl.textContent = em.error_message;
+        errEl.classList.remove('hidden');
+    }
+
+    // Attachments
+    const attachments = em.attachments || [];
+    const completedCount = attachments.filter(a => a.processing_status === 'completed').length;
+    const failedCount = attachments.filter(a => a.processing_status === 'failed').length;
+    const skippedCount = attachments.filter(a => a.processing_status === 'skipped').length;
+
+    document.getElementById('summary-total').textContent = em.attachment_count || attachments.length;
+    document.getElementById('summary-filed').textContent = completedCount;
+    if (failedCount > 0) {
+        document.getElementById('summary-failed-row').classList.remove('hidden');
+        document.getElementById('summary-failed').textContent = failedCount;
+    }
+    if (skippedCount > 0) {
+        document.getElementById('summary-skipped-row').classList.remove('hidden');
+        document.getElementById('summary-skipped').textContent = skippedCount;
+    }
+
+    // Render attachments list
+    const container = document.getElementById('attachments-list');
+    if (attachments.length === 0) {
+        container.innerHTML = '<p class="text-neutral-400 text-sm">No attachments</p>';
+    } else {
+        container.innerHTML = attachments.map(function(att) {
+            const statusColors = {
+                completed: 'bg-neutral-950',
+                processing: 'bg-neutral-300 status-dot-pulse',
+                pending: 'bg-neutral-300',
+                failed: 'bg-red-500',
+                skipped: 'bg-amber-400',
+            };
+            const dotClass = statusColors[att.processing_status] || 'bg-neutral-300';
+            const sizeStr = att.file_size_bytes ? formatSize(att.file_size_bytes) : '';
+            const docLink = att.document_id ? '<a href="/document/' + att.document_id + '" class="text-xs text-neutral-950 hover:underline font-medium">View Document</a>' : '';
+            const reason = att.skip_reason ? '<p class="text-xs text-neutral-400">' + escapeHtml(att.skip_reason) + '</p>' : '';
+
+            return '<div class="flex items-start gap-3 p-3 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors">' +
+                '<div class="relative flex-shrink-0 mt-0.5">' +
+                    '<div class="w-8 h-8 bg-neutral-100 rounded flex items-center justify-center">' +
+                        '<i data-lucide="file" class="w-4 h-4 text-neutral-500"></i>' +
+                    '</div>' +
+                    '<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ' + dotClass + ' ring-2 ring-white"></div>' +
+                '</div>' +
+                '<div class="min-w-0 flex-1">' +
+                    '<p class="text-sm font-medium text-neutral-950 truncate">' + escapeHtml(att.original_filename) + '</p>' +
+                    '<p class="text-xs text-neutral-400">' + escapeHtml(att.content_type || '') + (sizeStr ? ' -- ' + sizeStr : '') + ' -- ' + att.processing_status + '</p>' +
+                    reason +
+                    docLink +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function reprocessEmail() {
+    if (!confirm('Reprocess failed and skipped attachments?')) return;
+    try {
+        const res = await fetch('/api/email/ingestions/' + ingestionId + '/reprocess', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showAlert(data.message || 'Reprocessing started', 'success');
+            setTimeout(loadEmailDetail, 2000);
+        } else {
+            showAlert(data.detail || 'Reprocess failed', 'error');
+        }
+    } catch (err) {
+        showAlert('Reprocess failed: ' + err.message, 'error');
+    }
+}
+
+async function deleteEmail() {
+    if (!confirm('Delete this email ingestion record? This cannot be undone.')) return;
+    try {
+        const res = await fetch('/api/email/ingestions/' + ingestionId, { method: 'DELETE' });
+        if (res.ok) {
+            window.location = '/api/email/page';
+        } else {
+            const data = await res.json();
+            showAlert(data.detail || 'Delete failed', 'error');
+        }
+    } catch (err) {
+        showAlert('Delete failed: ' + err.message, 'error');
+    }
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Email Settings — Full Capacity{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <!-- Back link -->
+    <a href="/api/email/page" class="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-950 transition-colors mb-6">
+        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+        Back to Email Ingestions
+    </a>
+
+    <h1 class="text-2xl font-semibold text-neutral-950 tracking-tight mb-6">Email Settings</h1>
+
+    <!-- Section 1: Webhook Address -->
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 mb-6 card-hover">
+        <div class="flex items-center gap-2 mb-4">
+            <i data-lucide="at-sign" class="w-4 h-4 text-neutral-400"></i>
+            <h2 class="text-sm font-semibold text-neutral-950">Webhook Email Address</h2>
+        </div>
+        <p class="text-sm text-neutral-500 mb-4">Forward emails to this address. All attachments will be automatically extracted, classified, and filed.</p>
+        <div class="flex items-center gap-3 bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+            <code id="webhook-address" class="text-sm font-mono text-neutral-950 flex-1">docs@parse.fullcapacity.ai</code>
+            <button onclick="copyAddress()" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors inline-flex items-center gap-2">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span id="copy-text">Copy</span>
+            </button>
+        </div>
+        <p class="text-xs text-neutral-400 mt-3">MX records are pre-configured. No setup needed.</p>
+    </div>
+
+    <!-- Section 2: IMAP Configuration -->
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 mb-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <i data-lucide="inbox" class="w-4 h-4 text-neutral-400"></i>
+                <h2 class="text-sm font-semibold text-neutral-950">IMAP Configuration</h2>
+            </div>
+            <span id="imap-status" class="text-xs text-neutral-400"></span>
+        </div>
+        <p class="text-sm text-neutral-500 mb-5">Alternative to webhook. We poll your mailbox for new emails with attachments.</p>
+
+        <form id="imap-form" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">IMAP Server</label>
+                    <input type="text" name="host" id="imap-host" placeholder="imap.gmail.com"
+                        class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Port</label>
+                    <input type="number" name="port" id="imap-port" value="993"
+                        class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Username</label>
+                    <input type="text" name="username" id="imap-username" placeholder="your@email.com"
+                        class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Password</label>
+                    <div class="relative">
+                        <input type="password" name="password" id="imap-password" placeholder="App password"
+                            class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700">
+                            <i data-lucide="eye" id="pw-eye-icon" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Folder</label>
+                    <input type="text" name="folder" id="imap-folder" value="INBOX"
+                        class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Poll Interval</label>
+                    <select name="poll_interval_minutes" id="imap-interval"
+                        class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                        <option value="1">Every 1 minute</option>
+                        <option value="2">Every 2 minutes</option>
+                        <option value="5" selected>Every 5 minutes</option>
+                        <option value="10">Every 10 minutes</option>
+                        <option value="15">Every 15 minutes</option>
+                        <option value="30">Every 30 minutes</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="use_ssl" id="imap-ssl" checked
+                        class="w-4 h-4 rounded border-neutral-300 text-neutral-950 focus:ring-neutral-300">
+                    <span class="text-sm text-neutral-700">Use SSL/TLS</span>
+                </label>
+            </div>
+            <div class="flex items-center gap-3 pt-2">
+                <button type="button" onclick="testImapConnection()"
+                    class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <i data-lucide="plug" class="w-4 h-4"></i>
+                    <span id="test-text">Test Connection</span>
+                </button>
+                <button type="submit"
+                    class="bg-neutral-950 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors inline-flex items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    Save Configuration
+                </button>
+                <span id="imap-result" class="text-sm hidden"></span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Section 3: Sender Whitelist -->
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
+        <div class="flex items-center gap-2 mb-4">
+            <i data-lucide="shield" class="w-4 h-4 text-neutral-400"></i>
+            <h2 class="text-sm font-semibold text-neutral-950">Sender Whitelist</h2>
+        </div>
+        <p class="text-sm text-neutral-500 mb-4">Only process emails from these senders. Add email addresses or entire domains.</p>
+
+        <div class="flex items-center gap-3 mb-4">
+            <input type="text" id="whitelist-input" placeholder="user@example.com or example.com"
+                class="flex-1 h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+            <button onclick="addWhitelistEntry()"
+                class="bg-neutral-950 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors">
+                Add
+            </button>
+        </div>
+
+        <div id="whitelist-entries" class="space-y-2">
+            <p class="text-neutral-400 text-sm">Loading...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Email Settings';
+    setActiveNav('nav-email');
+    loadImapConfig();
+    loadWhitelist();
+});
+
+// Copy webhook address
+function copyAddress() {
+    const addr = document.getElementById('webhook-address').textContent;
+    navigator.clipboard.writeText(addr);
+    const btn = document.getElementById('copy-text');
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+}
+
+// Password visibility toggle
+function togglePasswordVisibility() {
+    const input = document.getElementById('imap-password');
+    const icon = document.getElementById('pw-eye-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.setAttribute('data-lucide', 'eye-off');
+    } else {
+        input.type = 'password';
+        icon.setAttribute('data-lucide', 'eye');
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// Load existing IMAP config
+async function loadImapConfig() {
+    try {
+        const res = await fetch('/api/email/imap/config');
+        if (!res.ok) return;
+        const config = await res.json();
+        if (config.host) {
+            document.getElementById('imap-host').value = config.host || '';
+            document.getElementById('imap-port').value = config.port || 993;
+            document.getElementById('imap-username').value = config.username || '';
+            document.getElementById('imap-folder').value = config.folder || 'INBOX';
+            document.getElementById('imap-interval').value = config.poll_interval_minutes || 5;
+            document.getElementById('imap-ssl').checked = config.use_ssl !== false;
+            if (config.last_polled_at) {
+                document.getElementById('imap-status').textContent = 'Last checked: ' + timeAgo(config.last_polled_at);
+            } else if (config.is_active) {
+                document.getElementById('imap-status').textContent = 'Active, not yet polled';
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load IMAP config:', err);
+    }
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+    return then.toLocaleDateString();
+}
+
+// Test IMAP connection
+async function testImapConnection() {
+    const resultEl = document.getElementById('imap-result');
+    const testText = document.getElementById('test-text');
+    testText.textContent = 'Testing...';
+    resultEl.classList.add('hidden');
+
+    const formData = new FormData();
+    formData.append('host', document.getElementById('imap-host').value);
+    formData.append('port', document.getElementById('imap-port').value);
+    formData.append('username', document.getElementById('imap-username').value);
+    formData.append('password', document.getElementById('imap-password').value);
+    formData.append('use_ssl', document.getElementById('imap-ssl').checked);
+
+    try {
+        const res = await fetch('/api/email/imap/test', { method: 'POST', body: formData });
+        const data = await res.json();
+        resultEl.classList.remove('hidden');
+        if (data.status === 'ok') {
+            resultEl.textContent = 'Connection successful';
+            resultEl.className = 'text-sm text-neutral-950 font-medium';
+        } else {
+            resultEl.textContent = data.message || 'Connection failed';
+            resultEl.className = 'text-sm text-red-600';
+        }
+    } catch (err) {
+        resultEl.classList.remove('hidden');
+        resultEl.textContent = 'Test failed: ' + err.message;
+        resultEl.className = 'text-sm text-red-600';
+    }
+    testText.textContent = 'Test Connection';
+}
+
+// Save IMAP config
+document.getElementById('imap-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('host', document.getElementById('imap-host').value);
+    formData.append('port', document.getElementById('imap-port').value);
+    formData.append('username', document.getElementById('imap-username').value);
+    formData.append('password', document.getElementById('imap-password').value);
+    formData.append('folder', document.getElementById('imap-folder').value);
+    formData.append('use_ssl', document.getElementById('imap-ssl').checked);
+    formData.append('poll_interval_minutes', document.getElementById('imap-interval').value);
+
+    try {
+        const res = await fetch('/api/email/imap/config', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok) {
+            showAlert('IMAP configuration saved and verified', 'success');
+        } else {
+            showAlert(data.detail || 'Failed to save IMAP config', 'error');
+        }
+    } catch (err) {
+        showAlert('Failed to save: ' + err.message, 'error');
+    }
+});
+
+// Whitelist
+async function loadWhitelist() {
+    try {
+        const res = await fetch('/api/email/whitelist');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderWhitelist(data.entries || []);
+    } catch (err) {
+        console.error('Failed to load whitelist:', err);
+    }
+}
+
+function renderWhitelist(entries) {
+    const container = document.getElementById('whitelist-entries');
+    if (!entries || entries.length === 0) {
+        container.innerHTML = '<p class="text-neutral-400 text-sm">No whitelist entries. All senders are accepted.</p>';
+        return;
+    }
+    container.innerHTML = entries.map(function(entry) {
+        return '<div class="flex items-center justify-between p-3 rounded-lg border border-neutral-100">' +
+            '<div class="flex items-center gap-2">' +
+                '<i data-lucide="user" class="w-4 h-4 text-neutral-400"></i>' +
+                '<span class="text-sm text-neutral-700">' + escapeHtml(entry.address_or_domain) + '</span>' +
+            '</div>' +
+            '<button onclick="removeWhitelistEntry(\'' + entry.id + '\')" class="text-neutral-400 hover:text-red-600 transition-colors">' +
+                '<i data-lucide="x" class="w-4 h-4"></i>' +
+            '</button>' +
+        '</div>';
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function addWhitelistEntry() {
+    const input = document.getElementById('whitelist-input');
+    const value = input.value.trim();
+    if (!value) return;
+
+    const formData = new FormData();
+    formData.append('address_or_domain', value);
+
+    try {
+        const res = await fetch('/api/email/whitelist', { method: 'POST', body: formData });
+        if (res.ok) {
+            input.value = '';
+            loadWhitelist();
+        } else {
+            showAlert('Failed to add whitelist entry', 'error');
+        }
+    } catch (err) {
+        showAlert('Failed to add: ' + err.message, 'error');
+    }
+}
+
+async function removeWhitelistEntry(id) {
+    try {
+        const res = await fetch('/api/email/whitelist/' + id, { method: 'DELETE' });
+        if (res.ok) {
+            loadWhitelist();
+        }
+    } catch (err) {
+        console.error('Failed to remove whitelist entry:', err);
+    }
+}
+</script>
+{% endblock %}

@@ -15,6 +15,8 @@ class Settings:
     STORAGE_BUCKET: str = os.getenv("STORAGE_BUCKET", "documents")
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_WEBHOOK_SECRET: str = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+    EMAIL_WEBHOOK_SECRET: str = os.getenv("EMAIL_WEBHOOK_SECRET", "")
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 
 
 settings = Settings()

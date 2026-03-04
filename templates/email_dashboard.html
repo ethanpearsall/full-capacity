@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Email Ingestion — Full Capacity{% endblock %}
+
+{% block content %}
+<!-- Stats row -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="mail" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Emails Received</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-total">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Total emails ingested</p>
+        </div>
+    </div>
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="clock" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Processed Today</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-today">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Emails received today</p>
+        </div>
+    </div>
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="paperclip" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Attachments Filed</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-attachments">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Successfully processed</p>
+        </div>
+    </div>
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover bento-card group">
+        <div class="bento-overlay rounded-xl"></div>
+        <div class="bento-content">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="check-circle" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Success Rate</span>
+            </div>
+            <p class="text-3xl font-bold text-neutral-950 tabular-nums" id="stat-rate">&mdash;</p>
+            <p class="text-xs text-neutral-400 mt-1">Attachment processing rate</p>
+        </div>
+    </div>
+</div>
+
+<!-- Email ingestion table -->
+<div id="emails-section">
+    <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-neutral-950">Email Ingestions</h2>
+            <a href="/api/email/settings-page" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+                Settings
+            </a>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-neutral-50">
+                    <tr>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">From</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Subject</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden md:table-cell">Attachments</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden lg:table-cell">Filed</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Status</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden md:table-cell">Received</th>
+                    </tr>
+                </thead>
+                <tbody id="emails-table">
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <div class="luma-spinner text-neutral-300 mx-auto" style="width:40px;"><span></span><span></span></div>
+                            <p class="text-neutral-400 text-sm mt-4">Loading emails...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="px-6 py-4 border-t border-neutral-100 flex items-center justify-between">
+            <span class="text-xs text-neutral-500" id="table-count"></span>
+            <div class="flex gap-2">
+                <button onclick="prevPage()" id="btn-prev" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Prev</button>
+                <button onclick="nextPage()" id="btn-next" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Email';
+    setActiveNav('nav-email');
+    loadStats();
+    loadEmails();
+});
+
+async function loadStats() {
+    try {
+        const res = await fetch('/api/email/stats');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('stat-total').textContent = data.total_emails;
+        document.getElementById('stat-today').textContent = data.emails_today;
+        document.getElementById('stat-attachments').textContent = data.attachments_processed;
+        document.getElementById('stat-rate').textContent = data.total_attachments > 0 ? data.success_rate + '%' : '--';
+    } catch (err) {
+        console.error('Failed to load email stats:', err);
+    }
+}
+
+let allEmails = [];
+let currentPage = 1;
+const PAGE_SIZE = 20;
+
+async function loadEmails(page) {
+    page = page || 1;
+    currentPage = page;
+    try {
+        const res = await fetch('/api/email/ingestions?page=' + page + '&per_page=' + PAGE_SIZE);
+        if (!res.ok) return;
+        const data = await res.json();
+        allEmails = data.ingestions || [];
+        renderEmails(allEmails);
+        document.getElementById('table-count').textContent = allEmails.length > 0 ? 'Showing ' + allEmails.length + ' emails (page ' + page + ')' : '';
+        document.getElementById('btn-prev').classList.toggle('hidden', page <= 1);
+        document.getElementById('btn-next').classList.toggle('hidden', allEmails.length < PAGE_SIZE);
+    } catch (err) {
+        console.error('Failed to load emails:', err);
+    }
+}
+
+function prevPage() { if (currentPage > 1) loadEmails(currentPage - 1); }
+function nextPage() { loadEmails(currentPage + 1); }
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+    return then.toLocaleDateString();
+}
+
+function renderEmails(emails) {
+    const tbody = document.getElementById('emails-table');
+    if (!emails || emails.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-12 text-center">' +
+            '<i data-lucide="mail" class="w-16 h-16 text-neutral-300 mx-auto mb-3"></i>' +
+            '<p class="text-neutral-500 text-sm font-medium mb-1">No emails ingested yet</p>' +
+            '<p class="text-neutral-400 text-xs mb-4">Forward emails with attachments to your dedicated address, or configure IMAP polling</p>' +
+            '<div class="flex items-center justify-center gap-3">' +
+            '<a href="/api/email/settings-page" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors">Configure IMAP</a>' +
+            '</div>' +
+            '</td></tr>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+
+    const statusMap = {
+        completed: 'bg-neutral-900 text-white',
+        processing: 'bg-neutral-200 text-neutral-700',
+        failed: 'bg-red-50 text-red-700 border border-red-200',
+        partial: 'bg-amber-50 text-amber-700 border border-amber-200',
+        received: 'bg-neutral-100 text-neutral-500',
+    };
+
+    tbody.innerHTML = emails.map(function(em) {
+        const statusClass = statusMap[em.status] || 'bg-neutral-100 text-neutral-600';
+        const fromName = em.from_name || em.from_address || 'Unknown';
+        const fromEmail = em.from_address || '';
+        const subject = em.subject || '(No subject)';
+        const truncSubject = subject.length > 60 ? subject.substring(0, 60) + '...' : subject;
+        const attCount = em.attachment_count || 0;
+        const procCount = em.processed_count || 0;
+
+        return '<tr class="border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer transition-colors" onclick="window.location=\'/api/email/page/' + em.id + '\'">' +
+            '<td class="px-6 py-4">' +
+                '<div class="min-w-0">' +
+                    '<p class="font-medium text-neutral-950 text-sm truncate max-w-[180px]">' + escapeHtml(fromName) + '</p>' +
+                    '<p class="text-xs text-neutral-400 truncate max-w-[180px]">' + escapeHtml(fromEmail) + '</p>' +
+                '</div>' +
+            '</td>' +
+            '<td class="px-6 py-4"><span class="text-sm text-neutral-700">' + escapeHtml(truncSubject) + '</span></td>' +
+            '<td class="px-6 py-4 hidden md:table-cell"><span class="text-sm text-neutral-500">' + attCount + ' file' + (attCount !== 1 ? 's' : '') + '</span></td>' +
+            '<td class="px-6 py-4 hidden lg:table-cell"><span class="text-sm text-neutral-500">' + procCount + ' / ' + attCount + '</span></td>' +
+            '<td class="px-6 py-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium ' + statusClass + '">' + em.status + '</span></td>' +
+            '<td class="px-6 py-4 hidden md:table-cell"><span class="text-sm text-neutral-500">' + timeAgo(em.received_at) + '</span></td>' +
+        '</tr>';
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+</script>
+{% endblock %}
