@@ -145,12 +145,15 @@ async def fetch_message(grant_id: str, message_id: str) -> dict:
 async def download_attachment(grant_id: str, message_id: str, attachment_id: str) -> bytes:
     """Download an attachment's content from Nylas API."""
     base = settings.NYLAS_API_URI.rstrip("/")
-    url = f"{base}/v3/grants/{grant_id}/messages/{message_id}/attachments/{attachment_id}/download"
+    url = f"{base}/v3/grants/{grant_id}/messages/{message_id}/attachments/{attachment_id}"
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url,
-            headers={"Authorization": f"Bearer {settings.NYLAS_API_KEY}"},
+            headers={
+                "Authorization": f"Bearer {settings.NYLAS_API_KEY}",
+                "Accept": "application/octet-stream",
+            },
             timeout=60,
         )
         resp.raise_for_status()
