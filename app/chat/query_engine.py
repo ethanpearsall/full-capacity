@@ -128,7 +128,7 @@ def _execute_search(org_id: str, filters: dict, limit: int) -> list[dict]:
                 "counterparty, document_date, matter_reference, amount, currency, "
                 "summary, confidence_score, folder_path, status, tags, uploaded_at, extracted_text")
         .eq("organisation_id", org_id)
-        .neq("status", "duplicate")
+        .not_.in_("status", ["duplicate", "duplicate_exact", "duplicate_name", "duplicate_content", "replaced"])
         .order("uploaded_at", desc=True)
         .limit(limit)
     )

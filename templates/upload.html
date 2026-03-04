@@ -54,6 +54,16 @@
                 </a>
             </div>
         </div>
+
+        <!-- Duplicate resolution modal -->
+        <div id="duplicate-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+            <div class="absolute inset-0 bg-black bg-opacity-40" onclick="closeDuplicateModal()"></div>
+            <div class="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+                <h3 id="dup-modal-title" class="text-lg font-semibold text-gray-900 mb-2"></h3>
+                <p id="dup-modal-message" class="text-sm text-gray-600 mb-6"></p>
+                <div id="dup-modal-actions" class="flex flex-wrap gap-3"></div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -160,17 +170,41 @@ async function uploadFiles() {
     }
 }
 
+let pendingDuplicates = [];
+
+function isDuplicateStatus(status) {
+    return status === 'duplicate_exact' || status === 'duplicate_name' || status === 'duplicate_content';
+}
+
 function showResults(results) {
     document.getElementById('upload-actions').classList.add('hidden');
     document.getElementById('file-list').innerHTML = '';
     document.getElementById('upload-results').classList.remove('hidden');
 
+    // Separate duplicates from resolved results
+    pendingDuplicates = results.filter(r => isDuplicateStatus(r.status));
+    const resolved = results.filter(r => !isDuplicateStatus(r.status));
+
+    renderResolvedResults(resolved);
+
+    // Show first duplicate dialog if any
+    if (pendingDuplicates.length > 0) {
+        showDuplicateDialog(pendingDuplicates[0]);
+    }
+}
+
+function renderResolvedResults(results) {
     const container = document.getElementById('results-list');
+    if (results.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
     container.innerHTML = results.map(r => {
         const isError = r.status === 'error';
-        const bg = isError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
-        const icon = isError ? '&#10005;' : '&#10003;';
-        const iconColor = isError ? 'text-red-500' : 'text-green-500';
+        const isDup = r.status === 'skipped';
+        const bg = isError ? 'bg-red-50 border-red-200' : isDup ? 'bg-gray-50 border-gray-200' : 'bg-green-50 border-green-200';
+        const icon = isError ? '&#10005;' : isDup ? '&#8212;' : '&#10003;';
+        const iconColor = isError ? 'text-red-500' : isDup ? 'text-gray-400' : 'text-green-500';
 
         return `<div class="p-4 rounded-lg border ${bg}">
             <div class="flex items-start justify-between">
@@ -178,20 +212,103 @@ function showResults(results) {
                     <span class="${iconColor} mr-2">${icon}</span>
                     <span class="font-medium text-gray-900">${escapeHtml(r.filename || r.filed_name || '')}</span>
                 </div>
-                ${!isError && r.id ? `<a href="/document/${r.id}" class="text-accent text-sm hover:underline">View</a>` : ''}
+                ${!isError && !isDup && r.id ? `<a href="/document/${r.id}" class="text-accent text-sm hover:underline">View</a>` : ''}
             </div>
             ${r.document_type ? `<p class="text-sm text-gray-600 mt-1">Type: <span class="capitalize">${r.document_type.replace(/_/g, ' ')}</span> | Client: ${escapeHtml(r.client_name || '—')}</p>` : ''}
             ${r.folder_path ? `<p class="text-xs text-gray-400 mt-1">Filed to: ${escapeHtml(r.folder_path)}</p>` : ''}
             ${isError ? `<p class="text-sm text-red-600 mt-1">${escapeHtml(r.error || 'Processing failed')}</p>` : ''}
+            ${isDup ? `<p class="text-sm text-gray-500 mt-1">Skipped</p>` : ''}
         </div>`;
     }).join('');
 }
 
+function showDuplicateDialog(result) {
+    const modal = document.getElementById('duplicate-modal');
+    const title = document.getElementById('dup-modal-title');
+    const message = document.getElementById('dup-modal-message');
+    const actions = document.getElementById('dup-modal-actions');
+    const info = result.duplicate_info;
+    const existingName = escapeHtml(info.existing_filename);
+    const uploadDate = info.existing_uploaded_at ? new Date(info.existing_uploaded_at).toLocaleDateString() : 'unknown date';
+    const filename = escapeHtml(result.filename);
+
+    if (result.status === 'duplicate_exact') {
+        title.textContent = 'Exact Duplicate Found';
+        message.innerHTML = `<strong>${filename}</strong> is identical to <strong>${existingName}</strong> uploaded on ${uploadDate}.`;
+        actions.innerHTML = `
+            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Skip</button>
+            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium">Upload Anyway</button>
+        `;
+    } else if (result.status === 'duplicate_name') {
+        title.textContent = 'Same Filename, Different Content';
+        message.innerHTML = `A file named <strong>${filename}</strong> already exists but this version is different. This may be an updated version.`;
+        actions.innerHTML = `
+            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Skip</button>
+            <button onclick="handleDuplicateAction('overwrite', '${result.id}', '${info.existing_id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Overwrite Previous</button>
+            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium">Keep Both</button>
+        `;
+    } else if (result.status === 'duplicate_content') {
+        title.textContent = 'Same Content, Different Name';
+        message.innerHTML = `This file's content matches <strong>${existingName}</strong> uploaded on ${uploadDate} — just with a different name.`;
+        actions.innerHTML = `
+            <button onclick="handleDuplicateAction('skip', '${result.id}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Skip</button>
+            <button onclick="handleDuplicateAction('force', '${result.id}')" class="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg text-sm font-medium">Upload Anyway</button>
+        `;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeDuplicateModal() {
+    document.getElementById('duplicate-modal').classList.add('hidden');
+}
+
+async function handleDuplicateAction(action, docId, existingId) {
+    closeDuplicateModal();
+
+    // Find and remove from pending list
+    const idx = pendingDuplicates.findIndex(d => d.id === docId);
+    let resolvedResult;
+
+    try {
+        if (action === 'skip') {
+            await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+            resolvedResult = { filename: pendingDuplicates[idx]?.filename, status: 'skipped' };
+        } else if (action === 'force') {
+            const res = await fetch(`/api/documents/${docId}/force-file`, { method: 'POST' });
+            resolvedResult = await res.json();
+        } else if (action === 'overwrite') {
+            const res = await fetch(`/api/documents/${existingId}/overwrite?doc_id=${docId}`, { method: 'PATCH' });
+            resolvedResult = await res.json();
+        }
+    } catch (err) {
+        resolvedResult = { filename: pendingDuplicates[idx]?.filename, status: 'error', error: err.message };
+    }
+
+    // Remove from pending and add to resolved results
+    if (idx !== -1) pendingDuplicates.splice(idx, 1);
+
+    // Re-render with resolved result added
+    const container = document.getElementById('results-list');
+    const existingHtml = container.innerHTML;
+    const newResults = [resolvedResult];
+    renderResolvedResults(newResults);
+    const newHtml = container.innerHTML;
+    container.innerHTML = existingHtml + newHtml;
+
+    // Show next duplicate dialog if any remain
+    if (pendingDuplicates.length > 0) {
+        showDuplicateDialog(pendingDuplicates[0]);
+    }
+}
+
 function resetUpload() {
     selectedFiles = [];
+    pendingDuplicates = [];
     document.getElementById('upload-results').classList.add('hidden');
-    document.getElementById('file-list').innerHTML = '';
+    document.getElementById('results-list').innerHTML = '';
     document.getElementById('upload-actions').classList.add('hidden');
+    document.getElementById('duplicate-modal').classList.add('hidden');
     const btn = document.getElementById('upload-btn');
     btn.disabled = false;
     btn.textContent = 'Upload & Process';
