@@ -81,6 +81,7 @@ async def exchange_code_for_grant(code: str) -> dict:
 
     payload = {
         "client_id": settings.NYLAS_CLIENT_ID,
+        "client_secret": settings.NYLAS_API_KEY,
         "code": code,
         "redirect_uri": settings.NYLAS_CALLBACK_URI,
         "grant_type": "authorization_code",
