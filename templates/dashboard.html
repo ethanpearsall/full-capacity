@@ -111,9 +111,10 @@
             <div class="flex justify-start">
                 <div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700">
                     Hello! I can help you search and query your documents. Try asking things like:<br><br>
-                    <em>"Find the Johnson invoice"</em><br>
-                    <em>"Show me all contracts from January"</em><br>
-                    <em>"What's the latest bank statement?"</em>
+                    <em>"What's going on with Thornton?"</em><br>
+                    <em>"Show me the Henderson engagement letter"</em><br>
+                    <em>"What was filed today?"</em><br>
+                    <em>"How much did we bill last month?"</em>
                 </div>
             </div>
         </div>
@@ -314,8 +315,8 @@ async function sendChatMessage() {
             messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 rounded-lg px-3 py-2 max-w-[80%] text-sm">Sorry, something went wrong.</div></div>`;
         } else {
             const data = await res.json();
-            const formatted = data.response.replace(/\n/g, '<br>').replace(/\*([^*]+)\*/g, '<strong>$1</strong>').replace(/_([^_]+)_/g, '<em>$1</em>');
-            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700">${formatted}</div></div>`;
+            const formatted = escapeHtml(data.response).replace(/\n/g, '<br>');
+            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700 whitespace-pre-line">${formatted}</div></div>`;
         }
     } catch (err) {
         const loadingEl = document.getElementById(loadingId);

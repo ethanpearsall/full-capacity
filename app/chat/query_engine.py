@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -12,248 +13,263 @@ logger = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-4-20250514"
 
-QUERY_PROMPT = """You are a document search assistant for a professional services firm.
-The user wants to find or ask about documents in their filing system.
+EXCLUDED_STATUSES = ["duplicate", "duplicate_exact", "duplicate_name", "duplicate_content", "replaced"]
 
-Given the user's query, determine:
-1. What they're looking for (document type, client name, date range, amount, etc.)
-2. Generate a search strategy
+INTERPRET_PROMPT = """You are a search query interpreter for a document filing system at a professional services firm.
 
-Return a JSON object (no other text, no markdown):
+Given the user's natural language query, extract the key search terms and any time filters.
+
+Return ONLY a JSON object (no markdown, no explanation):
 {{
-    "intent": "search|summary|count|compare|latest",
-    "search_filters": {{
-        "document_type": null,
-        "client_name": null,
-        "date_from": null,
-        "date_to": null,
-        "matter_reference": null,
-        "text_search": null,
-        "amount_min": null,
-        "amount_max": null
-    }},
-    "response_type": "list|detail|number|summary",
-    "limit": 5
+    "search_terms": ["term1", "term2"],
+    "time_filter": null,
+    "date_from": null,
+    "date_to": null,
+    "limit": 10
 }}
 
-Today's date is {today}. When the user says "last month", "this week", etc., calculate the actual dates.
+Rules:
+- search_terms: Extract the meaningful keywords the user is looking for. Names, document types, companies, amounts, etc. Strip filler words. If the query is about "recent docs" or "what was filed today", leave search_terms empty.
+- time_filter: One of "today", "this_week", "this_month", "last_month", "recent", or null. Use "recent" for vague recency requests.
+- date_from / date_to: If the user mentions specific dates or ranges, calculate them. Today is {today}.
+- limit: How many results to return. Default 10. Use 5 for "latest" or "most recent" queries. Use 20 for broad queries like "all invoices".
+
+Examples:
+- "what's going on with Thornton" -> {{"search_terms": ["Thornton"], "time_filter": null, "date_from": null, "date_to": null, "limit": 10}}
+- "recent docs" -> {{"search_terms": [], "time_filter": "recent", "date_from": null, "date_to": null, "limit": 5}}
+- "VAT returns from January" -> {{"search_terms": ["VAT", "vat_return"], "time_filter": null, "date_from": "2026-01-01", "date_to": "2026-01-31", "limit": 10}}
+- "Henderson engagement letter" -> {{"search_terms": ["Henderson", "engagement"], "time_filter": null, "date_from": null, "date_to": null, "limit": 10}}
+- "how much have we spent on office supplies" -> {{"search_terms": ["office supplies", "receipt", "invoice"], "time_filter": null, "date_from": null, "date_to": null, "limit": 20}}
+- "anything from HMRC" -> {{"search_terms": ["HMRC"], "time_filter": null, "date_from": null, "date_to": null, "limit": 10}}
 
 USER QUERY: {query}"""
 
-ANSWER_PROMPT = """Based on the following document, answer the user's question accurately and concisely.
+SYNTHESISE_PROMPT = """You are a document assistant for a professional services firm. You have access to the firm's document filing system.
 
-DOCUMENT: {document_title}
-TYPE: {document_type}
-CLIENT: {client_name}
+The user asked: "{question}"
 
-FULL TEXT:
-{extracted_text}
+Here are the relevant documents found:
 
-USER QUESTION: {question}
+{document_summaries}
 
-Answer in 1-3 sentences. Include specific numbers, dates, and names. If the answer isn't in the document, say so."""
+Respond conversationally and helpfully. Be specific — mention names, dates, amounts, and references.
+If multiple documents match, give a brief overview of each.
+If the user asks about a situation or status, synthesise the information across all matching documents into a coherent narrative.
+If no documents were found, say so and suggest they try different search terms.
+Keep responses concise but complete. Use natural language, not raw data dumps.
+Do NOT use markdown formatting — this displays in a small chat widget. Use plain text with line breaks.
+When mentioning monetary amounts, use the appropriate currency symbol (£, $, €)."""
 
 
 async def process_query(query: str, org_id: str) -> tuple[str, list[str]]:
     """Process a natural language query and return (response_text, document_ids)."""
-    # Step 1: Use Claude to understand the query and generate search filters
-    search_plan = _understand_query(query)
-    if search_plan is None:
-        return "I couldn't understand your query. Could you rephrase it?", []
+    # Stage 1: Interpret the query to extract search terms
+    search_plan = _interpret_query(query)
 
-    intent = search_plan.get("intent", "search")
-    filters = search_plan.get("search_filters", {})
-    response_type = search_plan.get("response_type", "list")
-    limit = min(search_plan.get("limit", 5), 20)
-
-    # Step 2: Execute the search against the database
-    documents = _execute_search(org_id, filters, limit)
-
-    if not documents:
-        return "No documents found matching your query. Try broadening your search.", []
-
+    # Stage 2: Smart search across multiple fields
+    documents = _smart_search(org_id, search_plan)
     doc_ids = [d["id"] for d in documents]
 
-    # Step 3: Format the response based on intent
-    if intent == "count":
-        return _format_count_response(documents, filters), doc_ids
+    if not documents:
+        return "I couldn't find any documents matching your query. Try different search terms or ask about a specific client or document type.", []
 
-    if intent == "summary" and len(documents) == 1:
-        # For a single document summary, use Claude to answer from full text
-        return _format_detail_response(documents[0], query), doc_ids
-
-    if intent == "latest":
-        return _format_document_list(documents[:1]), doc_ids[:1]
-
-    # Default: list of documents
-    return _format_document_list(documents), doc_ids
+    # Stage 3: Use Claude to synthesise a conversational response
+    response = _synthesise_response(query, documents)
+    return response, doc_ids
 
 
-def _understand_query(query: str) -> Optional[dict]:
-    """Use Claude to parse the user's natural language query into search filters."""
+def _interpret_query(query: str) -> dict:
+    """Use Claude to extract search terms and filters from the user's query."""
     try:
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         today = datetime.utcnow().strftime("%Y-%m-%d")
-        prompt = QUERY_PROMPT.format(today=today, query=query)
 
         message = client.messages.create(
             model=MODEL,
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+            messages=[{"role": "user", "content": INTERPRET_PROMPT.format(today=today, query=query)}],
         )
 
-        response_text = message.content[0].text.strip()
+        text = message.content[0].text.strip()
         try:
-            return json.loads(response_text)
+            return json.loads(text)
         except json.JSONDecodeError:
-            # Try to extract JSON
-            import re
-            match = re.search(r"\{.*\}", response_text, re.DOTALL)
+            match = re.search(r"\{.*\}", text, re.DOTALL)
             if match:
                 return json.loads(match.group(0))
-            logger.error("Could not parse query understanding response: %.500s", response_text)
-            return None
     except Exception:
-        logger.exception("Query understanding failed")
-        return None
+        logger.exception("Query interpretation failed")
+
+    # Fallback: use the raw query as a search term
+    return {"search_terms": [query], "time_filter": None, "date_from": None, "date_to": None, "limit": 10}
 
 
-def _execute_search(org_id: str, filters: dict, limit: int) -> list[dict]:
-    """Execute a database search with the given filters. Always scoped to org_id."""
+def _smart_search(org_id: str, plan: dict) -> list[dict]:
+    """Search across multiple document fields using OR conditions."""
     sb = get_supabase_admin()
+    search_terms = plan.get("search_terms") or []
+    time_filter = plan.get("time_filter")
+    date_from = plan.get("date_from")
+    date_to = plan.get("date_to")
+    limit = min(plan.get("limit", 10), 20)
+
+    select_fields = (
+        "id, original_filename, filed_name, document_type, client_name, "
+        "counterparty, document_date, matter_reference, amount, currency, "
+        "summary, folder_path, status, tags, uploaded_at, extracted_text"
+    )
 
     query = (
         sb.table("documents")
-        .select("id, original_filename, filed_name, document_type, client_name, "
-                "counterparty, document_date, matter_reference, amount, currency, "
-                "summary, confidence_score, folder_path, status, tags, uploaded_at, extracted_text")
+        .select(select_fields)
         .eq("organisation_id", org_id)
-        .not_.in_("status", ["duplicate", "duplicate_exact", "duplicate_name", "duplicate_content", "replaced"])
+        .not_.in_("status", EXCLUDED_STATUSES)
         .order("uploaded_at", desc=True)
         .limit(limit)
     )
 
-    doc_type = filters.get("document_type")
-    if doc_type:
-        query = query.eq("document_type", doc_type)
-
-    client_name = filters.get("client_name")
-    if client_name:
-        query = query.ilike("client_name", f"%{client_name}%")
-
-    date_from = filters.get("date_from")
+    # Apply time filters
+    time_cutoff = _resolve_time_filter(time_filter)
+    if time_cutoff:
+        query = query.gte("uploaded_at", time_cutoff)
     if date_from:
         query = query.gte("document_date", date_from)
-
-    date_to = filters.get("date_to")
     if date_to:
         query = query.lte("document_date", date_to)
 
-    ref = filters.get("matter_reference")
-    if ref:
-        query = query.ilike("matter_reference", f"%{ref}%")
+    # If no search terms, just return by recency (for "recent docs", "what was filed today")
+    if not search_terms:
+        try:
+            result = query.execute()
+            return result.data or []
+        except Exception:
+            logger.exception("Search execution failed")
+            return []
 
-    amount_min = filters.get("amount_min")
-    if amount_min is not None:
-        query = query.gte("amount", amount_min)
+    # Build OR filter across multiple fields for each search term
+    or_conditions = []
+    for term in search_terms:
+        escaped = term.replace("%", "").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        or_conditions.extend([
+            f"client_name.ilike.{pattern}",
+            f"counterparty.ilike.{pattern}",
+            f"summary.ilike.{pattern}",
+            f"document_type.ilike.{pattern}",
+            f"matter_reference.ilike.{pattern}",
+            f"original_filename.ilike.{pattern}",
+            f"filed_name.ilike.{pattern}",
+            f"extracted_text.ilike.{pattern}",
+        ])
 
-    amount_max = filters.get("amount_max")
-    if amount_max is not None:
-        query = query.lte("amount", amount_max)
-
-    text_search = filters.get("text_search")
-    if text_search:
-        query = query.text_search("fts", text_search)
+    query = query.or_(",".join(or_conditions))
 
     try:
         result = query.execute()
         return result.data or []
     except Exception:
-        logger.exception("Search execution failed")
+        logger.exception("Smart search failed")
         return []
 
 
-def _format_document_list(documents: list[dict]) -> str:
-    """Format a list of documents as a Telegram-friendly response."""
-    if not documents:
-        return "No documents found."
+def _resolve_time_filter(time_filter: Optional[str]) -> Optional[str]:
+    """Convert a time filter keyword to an ISO datetime string."""
+    if not time_filter:
+        return None
 
-    lines = []
-    for doc in documents:
+    now = datetime.utcnow()
+    if time_filter == "today":
+        cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == "this_week":
+        cutoff = now - timedelta(days=now.weekday())
+        cutoff = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == "this_month":
+        cutoff = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == "last_month":
+        first_of_month = now.replace(day=1)
+        cutoff = (first_of_month - timedelta(days=1)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == "recent":
+        cutoff = now - timedelta(days=7)
+    else:
+        return None
+
+    return cutoff.isoformat()
+
+
+def _synthesise_response(question: str, documents: list[dict]) -> str:
+    """Use Claude to generate a conversational response from matching documents."""
+    # Build document summaries for the prompt
+    summaries = []
+    for i, doc in enumerate(documents, 1):
         client = doc.get("client_name") or "Unknown"
         doc_type = (doc.get("document_type") or "other").replace("_", " ").title()
-        confidence = doc.get("confidence_score")
-        conf_str = f"{int(confidence * 100)}%" if confidence else "—"
-        doc_date = doc.get("document_date") or "—"
+        doc_date = doc.get("document_date") or "no date"
         amount = doc.get("amount")
         currency = doc.get("currency") or "GBP"
         ref = doc.get("matter_reference") or ""
         summary = doc.get("summary") or ""
-        folder = doc.get("folder_path") or ""
+        counterparty = doc.get("counterparty") or ""
+        filename = doc.get("filed_name") or doc.get("original_filename") or ""
+        uploaded = doc.get("uploaded_at") or ""
+        extracted = doc.get("extracted_text") or ""
 
         currency_symbols = {"GBP": "\u00a3", "USD": "$", "EUR": "\u20ac"}
-        symbol = currency_symbols.get(currency, currency)
+        symbol = currency_symbols.get(currency, currency + " ")
 
-        entry = f"*{client}*\n"
-        entry += f"Type: {doc_type} | Confidence: {conf_str}\n"
-        if doc_date != "—":
-            entry += f"Date: {doc_date}\n"
+        entry = f"Document {i}:\n"
+        entry += f"  Filename: {filename}\n"
+        entry += f"  Type: {doc_type}\n"
+        entry += f"  Client: {client}\n"
+        if counterparty:
+            entry += f"  Counterparty: {counterparty}\n"
+        entry += f"  Date: {doc_date}\n"
         if amount is not None:
-            entry += f"Amount: {symbol}{amount:,.2f}\n"
+            entry += f"  Amount: {symbol}{amount:,.2f}\n"
         if ref:
-            entry += f"Ref: {ref}\n"
+            entry += f"  Reference: {ref}\n"
         if summary:
-            entry += f"_{summary}_\n"
-        if folder:
-            entry += f"Filed: {folder}\n"
+            entry += f"  Summary: {summary}\n"
+        if uploaded:
+            entry += f"  Uploaded: {uploaded}\n"
+        # Include extracted text (truncated) for deeper answers
+        if extracted:
+            entry += f"  Full text excerpt: {extracted[:3000]}\n"
 
-        lines.append(entry)
+        summaries.append(entry)
 
-    return "\n---\n".join(lines)
-
-
-def _format_count_response(documents: list[dict], filters: dict) -> str:
-    """Format a count-style response."""
-    count = len(documents)
-    parts = [f"Found *{count}* document(s)"]
-
-    doc_type = filters.get("document_type")
-    if doc_type:
-        parts.append(f"of type _{doc_type}_")
-
-    client = filters.get("client_name")
-    if client:
-        parts.append(f"for client _{client}_")
-
-    return " ".join(parts) + "."
-
-
-def _format_detail_response(doc: dict, question: str) -> str:
-    """Use Claude to answer a specific question about a document."""
-    extracted_text = doc.get("extracted_text", "")
-    if not extracted_text:
-        # Fall back to summary
-        return _format_document_list([doc])
+    doc_summaries = "\n".join(summaries)
 
     try:
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        prompt = ANSWER_PROMPT.format(
-            document_title=doc.get("filed_name") or doc.get("original_filename", ""),
-            document_type=doc.get("document_type", ""),
-            client_name=doc.get("client_name", ""),
-            extracted_text=extracted_text[:10000],
-            question=question,
-        )
 
         message = client.messages.create(
             model=MODEL,
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1024,
+            messages=[{"role": "user", "content": SYNTHESISE_PROMPT.format(
+                question=question,
+                document_summaries=doc_summaries,
+            )}],
         )
 
-        answer = message.content[0].text.strip()
-        header = _format_document_list([doc])
-        return f"{header}\n\n*Answer:* {answer}"
+        return message.content[0].text.strip()
     except Exception:
-        logger.exception("Detail response generation failed")
-        return _format_document_list([doc])
+        logger.exception("Response synthesis failed")
+        # Fallback: simple formatted list
+        return _fallback_format(documents)
+
+
+def _fallback_format(documents: list[dict]) -> str:
+    """Simple fallback formatting if Claude synthesis fails."""
+    lines = []
+    for doc in documents:
+        client = doc.get("client_name") or "Unknown"
+        doc_type = (doc.get("document_type") or "other").replace("_", " ").title()
+        summary = doc.get("summary") or ""
+        name = doc.get("filed_name") or doc.get("original_filename") or ""
+        line = f"{doc_type} - {client}"
+        if name:
+            line = f"{name}\n  {line}"
+        if summary:
+            line += f"\n  {summary}"
+        lines.append(line)
+    return "\n\n".join(lines)
