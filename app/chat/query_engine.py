@@ -57,7 +57,7 @@ If multiple documents match, give a brief overview of each.
 If the user asks about a situation or status, synthesise the information across all matching documents into a coherent narrative.
 If no documents were found, say so and suggest they try different search terms.
 Keep responses concise but complete. Use natural language, not raw data dumps.
-Do NOT use markdown formatting — this displays in a small chat widget. Use plain text with line breaks.
+Do NOT use any markdown formatting — no bold (**), no italics (*), no headers (#), no bullet symbols. Use plain text only. Use line breaks and indentation for structure. Use dashes (-) for list items.
 When mentioning monetary amounts, use the appropriate currency symbol (£, $, €)."""
 
 
@@ -251,11 +251,32 @@ def _synthesise_response(question: str, documents: list[dict]) -> str:
             )}],
         )
 
-        return message.content[0].text.strip()
+        claude_response = message.content[0].text.strip()
     except Exception:
         logger.exception("Response synthesis failed")
-        # Fallback: simple formatted list
-        return _fallback_format(documents)
+        claude_response = _fallback_format(documents)
+
+    # Append clickable document reference links
+    claude_response += _build_document_links(documents)
+    return claude_response
+
+
+def _build_document_links(documents: list[dict]) -> str:
+    """Build an HTML links section for referenced documents."""
+    if not documents:
+        return ""
+
+    links = "\n\n---\nReferenced documents:"
+    for doc in documents:
+        name = doc.get("filed_name") or doc.get("original_filename") or "Unknown"
+        doc_type = (doc.get("document_type") or "").replace("_", " ").title()
+        doc_date = doc.get("document_date") or ""
+        doc_id = doc["id"]
+        label = f"{doc_type} — {name}" if doc_type else name
+        links += f'\n<a href="/document/{doc_id}">{label}</a>'
+        if doc_date:
+            links += f" ({doc_date})"
+    return links
 
 
 def _fallback_format(documents: list[dict]) -> str:

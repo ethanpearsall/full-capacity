@@ -84,6 +84,33 @@
 </div>
 
 <!-- Chat Widget -->
+<style>
+    #chat-panel {
+        width: 24rem;
+        height: 500px;
+        transition: width 0.3s ease, height 0.3s ease;
+    }
+    #chat-panel.expanded {
+        width: 60vw;
+        height: 80vh;
+    }
+    #chat-panel .chat-doc-link {
+        color: #3b82f6;
+        text-decoration: underline;
+        text-decoration-color: #93c5fd;
+    }
+    #chat-panel .chat-doc-link:hover {
+        color: #1d4ed8;
+        text-decoration-color: #1d4ed8;
+    }
+    #chat-panel .chat-ref-section {
+        border-top: 1px solid #e5e7eb;
+        margin-top: 0.75rem;
+        padding-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+</style>
 <div id="chat-widget" class="fixed bottom-6 right-6 z-50">
     <!-- Chat Toggle Button -->
     <button id="chat-toggle" onclick="toggleChat()"
@@ -97,13 +124,14 @@
     </button>
 
     <!-- Chat Panel -->
-    <div id="chat-panel" class="hidden absolute bottom-16 right-0 w-96 h-[500px] bg-white rounded-lg shadow-2xl border flex flex-col overflow-hidden">
+    <div id="chat-panel" class="hidden absolute bottom-16 right-0 bg-white rounded-lg shadow-2xl border flex flex-col overflow-hidden">
         <!-- Header -->
         <div class="bg-sidebar text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
             <div>
                 <h3 class="font-semibold text-sm">Document Assistant</h3>
                 <p class="text-gray-400 text-xs">Ask about your documents</p>
             </div>
+            <button id="chat-expand-btn" onclick="toggleChatExpand()" class="text-gray-400 hover:text-white ml-3 text-lg" title="Expand">&#x2922;</button>
         </div>
 
         <!-- Messages -->
@@ -272,6 +300,8 @@ async function loadFolderDocs(path) {
 }
 
 // Chat widget functions
+let chatExpanded = false;
+
 function toggleChat() {
     const panel = document.getElementById('chat-panel');
     const iconOpen = document.getElementById('chat-icon-open');
@@ -283,6 +313,55 @@ function toggleChat() {
     if (isHidden) {
         document.getElementById('chat-input').focus();
     }
+}
+
+function toggleChatExpand() {
+    const panel = document.getElementById('chat-panel');
+    const btn = document.getElementById('chat-expand-btn');
+    chatExpanded = !chatExpanded;
+    panel.classList.toggle('expanded', chatExpanded);
+    btn.innerHTML = chatExpanded ? '&#x2921;' : '&#x2922;';
+    btn.title = chatExpanded ? 'Collapse' : 'Expand';
+}
+
+function formatChatResponse(raw) {
+    // Split into conversational part and links section at the "---" separator
+    const separator = '\n\n---\n';
+    const sepIdx = raw.indexOf(separator);
+
+    let conversational, linkSection;
+    if (sepIdx !== -1) {
+        conversational = raw.substring(0, sepIdx);
+        linkSection = raw.substring(sepIdx + separator.length);
+    } else {
+        conversational = raw;
+        linkSection = '';
+    }
+
+    // Escape the conversational text, then convert newlines
+    let html = escapeHtml(conversational).replace(/\n/g, '<br>');
+
+    // Process the links section: allow <a> tags through
+    if (linkSection) {
+        // Parse out the "Referenced documents:" header and individual link lines
+        const lines = linkSection.split('\n');
+        let linksHtml = '<div class="chat-ref-section">';
+        for (const line of lines) {
+            const linkMatch = line.match(/^<a href="(\/document\/[^"]+)">(.+?)<\/a>(.*)$/);
+            if (linkMatch) {
+                const href = linkMatch[1];
+                const text = escapeHtml(linkMatch[2]);
+                const suffix = escapeHtml(linkMatch[3]);
+                linksHtml += `<div><a href="${href}" class="chat-doc-link">${text}</a>${suffix}</div>`;
+            } else {
+                linksHtml += `<div>${escapeHtml(line)}</div>`;
+            }
+        }
+        linksHtml += '</div>';
+        html += linksHtml;
+    }
+
+    return html;
 }
 
 async function sendChatMessage() {
@@ -315,8 +394,8 @@ async function sendChatMessage() {
             messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 rounded-lg px-3 py-2 max-w-[80%] text-sm">Sorry, something went wrong.</div></div>`;
         } else {
             const data = await res.json();
-            const formatted = escapeHtml(data.response).replace(/\n/g, '<br>');
-            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700 whitespace-pre-line">${formatted}</div></div>`;
+            const formatted = formatChatResponse(data.response);
+            messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-gray-100 rounded-lg px-3 py-2 max-w-[80%] text-sm text-gray-700">${formatted}</div></div>`;
         }
     } catch (err) {
         const loadingEl = document.getElementById(loadingId);
