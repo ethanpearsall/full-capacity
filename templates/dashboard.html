@@ -62,70 +62,69 @@
     </div>
 </div>
 
-<!-- Two-column layout: documents table + right panel -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Documents table (col-span-2) -->
-    <div class="lg:col-span-2" id="documents-section">
-        <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
-            <!-- Table header -->
-            <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
-                <h2 class="text-lg font-semibold text-neutral-950">Documents</h2>
-                <a href="/upload" class="bg-neutral-950 text-white px-4 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium inline-flex items-center gap-2">
-                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                    Upload
-                </a>
-            </div>
-
-            <!-- Filter bar -->
-            <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-100 flex items-center gap-3">
-                <div class="relative flex-1 max-w-xs">
-                    <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
-                    <input type="text" id="search-input" placeholder="Search..."
-                        class="w-full h-8 text-xs rounded-md border border-neutral-200 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
-                </div>
-            </div>
-
-            <!-- Table -->
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-neutral-50">
-                        <tr>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Document</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Type</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden md:table-cell">Date</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden lg:table-cell">Confidence</th>
-                            <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="documents-table">
-                        <tr>
-                            <td colspan="5" class="px-6 py-12 text-center">
-                                <div class="luma-spinner text-neutral-300 mx-auto" style="width:40px;"><span></span><span></span></div>
-                                <p class="text-neutral-400 text-sm mt-4">Loading documents...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <div class="px-6 py-4 border-t border-neutral-100 flex items-center justify-between">
-                <span class="text-xs text-neutral-500" id="table-count"></span>
-                <div class="flex gap-2">
-                    <button onclick="prevPage()" id="btn-prev" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Prev</button>
-                    <button onclick="nextPage()" id="btn-next" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Next</button>
-                </div>
-            </div>
+<!-- Collapsible Recent Activity -->
+<div class="bg-white border border-neutral-200 rounded-xl overflow-hidden mb-6">
+    <button onclick="toggleActivityFeed()" class="w-full px-6 py-4 flex items-center justify-between hover:bg-neutral-50 transition-colors">
+        <h3 class="text-sm font-semibold text-neutral-950">Recent Activity</h3>
+        <i data-lucide="chevron-down" id="activity-chevron" class="w-4 h-4 text-neutral-400 transition-transform duration-200"></i>
+    </button>
+    <div id="activity-collapsible" class="border-t border-neutral-100">
+        <div class="p-4 space-y-3" id="activity-feed">
+            <div class="text-center py-4 text-neutral-400 text-xs">Loading...</div>
         </div>
     </div>
+</div>
 
-    <!-- Right panel -->
-    <div class="space-y-6">
-        <!-- Activity feed -->
-        <div>
-            <h3 class="text-sm font-semibold text-neutral-950 mb-3">Recent Activity</h3>
-            <div class="bg-neutral-50 border border-neutral-200 rounded-xl p-4 space-y-3" id="activity-feed">
-                <div class="text-center py-4 text-neutral-400 text-xs">Loading...</div>
+<!-- Documents table -->
+<div id="documents-section">
+    <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+        <!-- Table header -->
+        <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-neutral-950">Documents</h2>
+            <a href="/upload" class="bg-neutral-950 text-white px-4 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium inline-flex items-center gap-2">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                Upload
+            </a>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-100 flex items-center gap-3">
+            <div class="relative flex-1 max-w-xs">
+                <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+                <input type="text" id="search-input" placeholder="Search..."
+                    class="w-full h-8 text-xs rounded-md border border-neutral-200 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-neutral-50">
+                    <tr>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Document</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Type</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden md:table-cell">Date</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden lg:table-cell">Confidence</th>
+                        <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="documents-table">
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="luma-spinner text-neutral-300 mx-auto" style="width:40px;"><span></span><span></span></div>
+                            <p class="text-neutral-400 text-sm mt-4">Loading documents...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="px-6 py-4 border-t border-neutral-100 flex items-center justify-between">
+            <span class="text-xs text-neutral-500" id="table-count"></span>
+            <div class="flex gap-2">
+                <button onclick="prevPage()" id="btn-prev" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Prev</button>
+                <button onclick="nextPage()" id="btn-next" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Next</button>
             </div>
         </div>
     </div>
@@ -304,6 +303,15 @@ function renderDocuments(docs) {
         </tr>`;
     }).join('');
     lucide.createIcons();
+}
+
+// Activity feed toggle
+function toggleActivityFeed() {
+    const content = document.getElementById('activity-collapsible');
+    const chevron = document.getElementById('activity-chevron');
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? '' : 'none';
+    chevron.style.transform = isHidden ? '' : 'rotate(-90deg)';
 }
 
 // Activity feed
