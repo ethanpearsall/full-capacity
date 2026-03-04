@@ -74,20 +74,38 @@ async def exchange_code_for_grant(code: str) -> dict:
     """Exchange an OAuth authorization code for a Nylas grant.
 
     Returns the grant response including grant_id and email.
+    Uses Bearer API key auth per Nylas v3 docs (no client_secret in body).
     """
     base = settings.NYLAS_API_URI.rstrip("/")
     url = f"{base}/v3/connect/token"
 
     payload = {
         "client_id": settings.NYLAS_CLIENT_ID,
-        "client_secret": settings.NYLAS_CLIENT_SECRET,
         "code": code,
-        "grant_type": "authorization_code",
         "redirect_uri": settings.NYLAS_CALLBACK_URI,
+        "grant_type": "authorization_code",
     }
 
+    headers = {
+        "Authorization": f"Bearer {settings.NYLAS_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    logger.error(
+        "Nylas token exchange request -- URL: %s, payload: %s",
+        url,
+        {k: (v if k != "code" else v[:8] + "...") for k, v in payload.items()},
+    )
+
     async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, timeout=30)
+        resp = await client.post(url, json=payload, headers=headers, timeout=30)
+
+        logger.error(
+            "Nylas token exchange response -- status: %s, body: %s",
+            resp.status_code,
+            resp.text,
+        )
+
         resp.raise_for_status()
         return resp.json()
 
