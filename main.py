@@ -1,4 +1,7 @@
 import logging
+import sys
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Query, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -9,14 +12,53 @@ from app.documents.router import router as documents_router
 from app.dashboard.router import router as dashboard_router
 from app.chat.router import router as chat_router
 from app.database import get_supabase_admin
+from app.config import settings
 
+# Force logging configuration — force=True ensures this works even if imported
+# libraries (supabase, anthropic, etc.) already configured the root logger,
+# which would cause basicConfig() without force to silently no-op.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+    force=True,
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Full Capacity", description="AI Document Processing & Filing System")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """App startup/shutdown lifecycle."""
+    # Register Telegram webhook on startup if token is configured
+    if settings.TELEGRAM_BOT_TOKEN:
+        try:
+            from app.chat.bot import set_webhook
+            webhook_url = f"{settings.APP_URL.rstrip('/')}/webhook/telegram"
+            result = await set_webhook(webhook_url)
+            if result:
+                print(f"[STARTUP] Telegram webhook registered: {webhook_url}", flush=True)
+            else:
+                print("[STARTUP] Failed to register Telegram webhook", flush=True)
+        except Exception as e:
+            print(f"[STARTUP] Telegram webhook setup error: {e}", flush=True)
+    else:
+        print("[STARTUP] TELEGRAM_BOT_TOKEN not set, skipping webhook registration", flush=True)
+
+    # Log API key status (not the key itself)
+    api_key = settings.ANTHROPIC_API_KEY
+    if api_key:
+        print(f"[STARTUP] ANTHROPIC_API_KEY loaded ({len(api_key)} chars, starts with {api_key[:7]}...)", flush=True)
+    else:
+        print("[STARTUP] WARNING: ANTHROPIC_API_KEY is empty!", flush=True)
+
+    yield
+
+
+app = FastAPI(
+    title="Full Capacity",
+    description="AI Document Processing & Filing System",
+    lifespan=lifespan,
+)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

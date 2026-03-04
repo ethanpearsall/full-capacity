@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import traceback
 from typing import Optional
 
 import anthropic
@@ -9,6 +10,12 @@ from app.config import settings
 from app.documents.models import ClassificationResult
 
 logger = logging.getLogger(__name__)
+
+
+def _log(msg: str) -> None:
+    """Print to stdout (always visible in Railway) and also log."""
+    print(f"[CLASSIFIER] {msg}", flush=True)
+    logger.info(msg)
 
 CLASSIFICATION_PROMPT = """You are an expert document analyst for UK professional services firms (law firms, accountancies, bookkeepers, tax consultants, quantity surveyors).
 
@@ -70,13 +77,26 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
     Uses a two-pass approach: first classifies and extracts metadata,
     then does a focused extraction pass if confidence is low or client_name is missing.
     """
+    _log(f"classify_document called: filename={original_filename}, text_length={len(text) if text else 0}")
+
     if not text or not text.strip():
-        logger.warning("Empty text provided for classification")
+        _log("Empty text provided — returning empty fallback")
         return ClassificationResult(
             document_type="other",
             confidence=0.0,
             summary="No text could be extracted from this document.",
         )
+
+    # Check API key is available
+    api_key = settings.ANTHROPIC_API_KEY
+    if not api_key:
+        _log("ERROR: ANTHROPIC_API_KEY is empty! Cannot classify.")
+        return ClassificationResult(
+            document_type="other",
+            confidence=0.1,
+            summary="Classification unavailable: API key not configured.",
+        )
+    _log(f"API key present ({len(api_key)} chars)")
 
     # Truncate text if too long
     truncated_text = text[:MAX_TEXT_LENGTH]
@@ -84,31 +104,35 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
         truncated_text += "\n\n[... text truncated ...]"
 
     prompt = CLASSIFICATION_PROMPT + truncated_text
+    _log(f"Prompt built: {len(prompt)} chars, model={MODEL}")
 
     # First pass: full classification
     result = None
     try:
         result = _call_claude(prompt)
         if result:
-            logger.info(
-                "First pass: type=%s confidence=%.2f client=%s",
-                result.document_type,
-                result.confidence,
-                result.client_name,
-            )
-    except Exception:
-        logger.exception("First classification attempt failed")
+            _log(f"First pass SUCCESS: type={result.document_type} confidence={result.confidence:.2f} client={result.client_name}")
+        else:
+            _log("First pass returned None (JSON parse failure)")
+    except Exception as e:
+        _log(f"First pass EXCEPTION: {type(e).__name__}: {e}")
+        print(f"[CLASSIFIER] First pass traceback:\n{traceback.format_exc()}", flush=True)
 
     if result is None:
         # Retry once on failure
         try:
-            logger.info("Retrying classification...")
+            _log("Retrying classification (attempt 2)...")
             result = _call_claude(prompt)
-        except Exception:
-            logger.exception("Second classification attempt failed")
+            if result:
+                _log(f"Retry SUCCESS: type={result.document_type}")
+            else:
+                _log("Retry returned None")
+        except Exception as e:
+            _log(f"Retry EXCEPTION: {type(e).__name__}: {e}")
+            print(f"[CLASSIFIER] Retry traceback:\n{traceback.format_exc()}", flush=True)
 
     if result is None:
-        logger.warning("All classification attempts failed, returning fallback result")
+        _log("ALL classification attempts failed — returning fallback")
         return ClassificationResult(
             document_type="other",
             confidence=0.1,
@@ -122,14 +146,15 @@ def classify_document(text: str, original_filename: str = "") -> ClassificationR
     )
 
     if needs_second_pass:
-        logger.info("Running second-pass extraction (confidence=%.2f, client=%s)", result.confidence, result.client_name)
+        _log(f"Running second-pass extraction (confidence={result.confidence:.2f}, client={result.client_name})")
         try:
             extraction = _run_extraction_pass(result.document_type, truncated_text)
             if extraction:
                 result = _merge_extraction(result, extraction)
-                logger.info("Second pass merged: client=%s, date=%s, ref=%s", result.client_name, result.document_date, result.matter_reference)
-        except Exception:
-            logger.exception("Second-pass extraction failed")
+                _log(f"Second pass merged: client={result.client_name}, date={result.document_date}, ref={result.matter_reference}")
+        except Exception as e:
+            _log(f"Second-pass extraction EXCEPTION: {type(e).__name__}: {e}")
+            print(f"[CLASSIFIER] Second-pass traceback:\n{traceback.format_exc()}", flush=True)
 
     return result
 
@@ -163,9 +188,10 @@ def _merge_extraction(result: ClassificationResult, extraction: dict) -> Classif
 
 def _call_claude(prompt: str) -> Optional[ClassificationResult]:
     """Make API call to Claude and parse the response."""
+    _log(f"Creating Anthropic client...")
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    logger.info("Calling Claude API with model %s", MODEL)
+    _log(f"Sending request to Claude API (model={MODEL})...")
     message = client.messages.create(
         model=MODEL,
         max_tokens=1024,
@@ -173,11 +199,11 @@ def _call_claude(prompt: str) -> Optional[ClassificationResult]:
     )
 
     response_text = message.content[0].text
-    logger.info("Claude API response received (%d chars)", len(response_text))
+    _log(f"Claude API response received ({len(response_text)} chars)")
     parsed = _parse_json_response(response_text)
 
     if parsed is None:
-        logger.error("Failed to parse JSON from Claude response: %.500s", response_text)
+        _log(f"JSON parse FAILED. Response preview: {response_text[:300]}")
         return None
 
     return _build_result(parsed)
