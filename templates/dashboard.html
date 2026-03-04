@@ -94,10 +94,20 @@
         width: 60vw;
         height: 80vh;
     }
+    #chat-messages .bg-gray-100,
+    #chat-messages .bg-accent {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
     #chat-panel .chat-doc-link {
         color: #3b82f6;
         text-decoration: underline;
         text-decoration-color: #93c5fd;
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     #chat-panel .chat-doc-link:hover {
         color: #1d4ed8;
@@ -109,6 +119,7 @@
         padding-top: 0.5rem;
         font-size: 0.8rem;
         color: #6b7280;
+        overflow: hidden;
     }
 </style>
 <div id="chat-widget" class="fixed bottom-6 right-6 z-50">
@@ -163,10 +174,14 @@
 
 {% block scripts %}
 <script>
+const CHAT_STORAGE_KEY = 'fullcapacity_chat_messages';
+const CHAT_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+
 document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadDocuments();
     loadFolderTree();
+    restoreChatMessages();
 });
 
 document.getElementById('search-input').addEventListener('keydown', (e) => {
@@ -299,6 +314,42 @@ async function loadFolderDocs(path) {
     }
 }
 
+// Chat persistence functions
+function saveChatMessages() {
+    const messagesDiv = document.getElementById('chat-messages');
+    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    let createdAt;
+    if (stored) {
+        try {
+            createdAt = JSON.parse(stored).created_at;
+        } catch (e) { /* ignore */ }
+    }
+    if (!createdAt) {
+        createdAt = Date.now();
+    }
+    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
+        messages: messagesDiv.innerHTML,
+        created_at: createdAt,
+    }));
+}
+
+function restoreChatMessages() {
+    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    if (!stored) return;
+    try {
+        const data = JSON.parse(stored);
+        if (Date.now() - data.created_at > CHAT_EXPIRY_MS) {
+            sessionStorage.removeItem(CHAT_STORAGE_KEY);
+            return;
+        }
+        if (data.messages) {
+            document.getElementById('chat-messages').innerHTML = data.messages;
+        }
+    } catch (e) {
+        sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+}
+
 // Chat widget functions
 let chatExpanded = false;
 
@@ -312,6 +363,8 @@ function toggleChat() {
     iconClose.classList.toggle('hidden', !isHidden);
     if (isHidden) {
         document.getElementById('chat-input').focus();
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 }
 
@@ -343,16 +396,15 @@ function formatChatResponse(raw) {
 
     // Process the links section: allow <a> tags through
     if (linkSection) {
-        // Parse out the "Referenced documents:" header and individual link lines
         const lines = linkSection.split('\n');
         let linksHtml = '<div class="chat-ref-section">';
         for (const line of lines) {
-            const linkMatch = line.match(/^<a href="(\/document\/[^"]+)">(.+?)<\/a>(.*)$/);
+            const linkMatch = line.match(/^<a href="(\/document\/[^"]+)"(?: target="_blank")?>(.+?)<\/a>(.*)$/);
             if (linkMatch) {
                 const href = linkMatch[1];
                 const text = escapeHtml(linkMatch[2]);
                 const suffix = escapeHtml(linkMatch[3]);
-                linksHtml += `<div><a href="${href}" class="chat-doc-link">${text}</a>${suffix}</div>`;
+                linksHtml += `<div><a href="${href}" target="_blank" class="chat-doc-link">${text}</a><span>${suffix}</span></div>`;
             } else {
                 linksHtml += `<div>${escapeHtml(line)}</div>`;
             }
@@ -375,6 +427,7 @@ async function sendChatMessage() {
     messagesDiv.innerHTML += `<div class="flex justify-end"><div class="bg-accent text-white rounded-lg px-3 py-2 max-w-[80%] text-sm">${escapeHtml(query)}</div></div>`;
     input.value = '';
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    saveChatMessages();
 
     // Add loading indicator
     const loadingId = 'loading-' + Date.now();
@@ -403,6 +456,7 @@ async function sendChatMessage() {
         messagesDiv.innerHTML += `<div class="flex justify-start"><div class="bg-red-50 text-red-700 rounded-lg px-3 py-2 max-w-[80%] text-sm">Connection error. Please try again.</div></div>`;
     }
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    saveChatMessages();
 }
 </script>
 {% endblock %}

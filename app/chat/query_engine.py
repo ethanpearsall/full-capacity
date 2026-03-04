@@ -44,7 +44,9 @@ Examples:
 
 USER QUERY: {query}"""
 
-SYNTHESISE_PROMPT = """You are a document assistant for a professional services firm. You have access to the firm's document filing system.
+SYNTHESISE_PROMPT = """CRITICAL FORMATTING RULE: Your response must be plain text ONLY. Never use markdown. Never use ** or * for bold/italic. Never use # for headers. Never use bullet points with * or •. Use dashes (-) for lists. Use line breaks for separation. This is displayed in a small chat widget that does not render markdown.
+
+You are a document assistant for a professional services firm. You have access to the firm's document filing system.
 
 The user asked: "{question}"
 
@@ -57,7 +59,6 @@ If multiple documents match, give a brief overview of each.
 If the user asks about a situation or status, synthesise the information across all matching documents into a coherent narrative.
 If no documents were found, say so and suggest they try different search terms.
 Keep responses concise but complete. Use natural language, not raw data dumps.
-Do NOT use any markdown formatting — no bold (**), no italics (*), no headers (#), no bullet symbols. Use plain text only. Use line breaks and indentation for structure. Use dashes (-) for list items.
 When mentioning monetary amounts, use the appropriate currency symbol (£, $, €)."""
 
 
@@ -273,7 +274,7 @@ def _build_document_links(documents: list[dict]) -> str:
         doc_date = doc.get("document_date") or ""
         doc_id = doc["id"]
         label = f"{doc_type} — {name}" if doc_type else name
-        links += f'\n<a href="/document/{doc_id}">{label}</a>'
+        links += f'\n<a href="/document/{doc_id}" target="_blank">{label}</a>'
         if doc_date:
             links += f" ({doc_date})"
     return links
