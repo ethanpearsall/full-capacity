@@ -29,6 +29,13 @@ from app.email.helpers import (
 from app.email.processor import (
     process_email_attachments,
 )
+from app.email.nylas_service import (
+    exchange_code_for_grant,
+    fetch_message,
+    get_nylas_auth_url,
+    process_nylas_message,
+    verify_webhook_signature,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/email", tags=["email"])
@@ -483,3 +490,350 @@ async def remove_whitelist_entry(
         "organisation_id", current_user["organisation_id"]
     ).execute()
     return {"status": "ok", "message": "Whitelist entry removed"}
+
+
+# ---------------------------------------------------------------------------
+# Nylas OAuth flow
+# ---------------------------------------------------------------------------
+
+@router.get("/nylas/connect")
+async def nylas_connect(
+    provider: str = Query(..., regex="^(google|microsoft)$"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Start the Nylas OAuth flow. Redirects to Nylas hosted auth page."""
+    from fastapi.responses import RedirectResponse
+
+    org_id = current_user["organisation_id"]
+    callback_uri = settings.NYLAS_CALLBACK_URI or f"{settings.APP_URL.rstrip('/')}/api/email/nylas/callback"
+    auth_url = get_nylas_auth_url(provider, org_id, callback_uri)
+    return RedirectResponse(url=auth_url, status_code=302)
+
+
+@router.get("/nylas/callback", include_in_schema=False)
+async def nylas_callback(
+    request: Request,
+    code: str = Query(""),
+    state: str = Query(""),
+):
+    """Handle Nylas OAuth callback after user authorizes.
+
+    The state parameter contains the organisation ID.
+    """
+    from fastapi.responses import RedirectResponse
+
+    if not code:
+        logger.warning("Nylas callback received without code")
+        return RedirectResponse(url="/api/email/settings-page?error=no_code", status_code=302)
+
+    org_id = state
+    if not org_id:
+        logger.warning("Nylas callback received without state (org_id)")
+        return RedirectResponse(url="/api/email/settings-page?error=no_state", status_code=302)
+
+    try:
+        grant_data = await exchange_code_for_grant(code)
+    except Exception as e:
+        logger.error("Nylas token exchange failed: %s", str(e))
+        return RedirectResponse(url="/api/email/settings-page?error=token_exchange", status_code=302)
+
+    grant_id = grant_data.get("grant_id", "")
+    email_address = grant_data.get("email", "")
+    provider = grant_data.get("provider", "unknown")
+
+    if not grant_id:
+        logger.error("Nylas grant response missing grant_id: %s", grant_data)
+        return RedirectResponse(url="/api/email/settings-page?error=no_grant", status_code=302)
+
+    sb = get_supabase_admin()
+
+    # Check if connection already exists for this email + org
+    existing = (
+        sb.table("email_connections")
+        .select("id")
+        .eq("organisation_id", org_id)
+        .eq("email_address", email_address)
+        .limit(1)
+        .execute()
+    )
+
+    if existing.data:
+        # Update existing connection
+        sb.table("email_connections").update({
+            "grant_id": grant_id,
+            "provider": provider,
+            "status": "active",
+            "error_message": None,
+            "updated_at": datetime.utcnow().isoformat(),
+        }).eq("id", existing.data[0]["id"]).execute()
+    else:
+        # Create new connection
+        sb.table("email_connections").insert({
+            "id": str(uuid.uuid4()),
+            "organisation_id": org_id,
+            "provider": provider,
+            "email_address": email_address,
+            "grant_id": grant_id,
+            "status": "active",
+        }).execute()
+
+    return RedirectResponse(url="/api/email/settings-page?connected=1", status_code=302)
+
+
+# ---------------------------------------------------------------------------
+# Nylas webhook receiver
+# ---------------------------------------------------------------------------
+
+@router.get("/nylas/webhook")
+async def nylas_webhook_challenge(challenge: str = Query(...)):
+    """Respond to Nylas webhook challenge for verification."""
+    return challenge
+
+
+@router.post("/nylas/webhook")
+async def nylas_webhook_receiver(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Receive Nylas webhook notifications for new messages.
+
+    Always returns 200 to acknowledge receipt.
+    """
+    raw_body = await request.body()
+
+    # Verify signature
+    signature = request.headers.get("x-nylas-signature", "")
+    if settings.NYLAS_WEBHOOK_SECRET and not verify_webhook_signature(raw_body, signature):
+        logger.warning("Invalid Nylas webhook signature")
+        return {"status": "ok"}
+
+    try:
+        payload = json.loads(raw_body)
+    except Exception:
+        return {"status": "ok"}
+
+    # Handle message.created events
+    webhook_type = payload.get("type", "")
+    if webhook_type != "message.created":
+        return {"status": "ok"}
+
+    data = payload.get("data", {})
+    if not data:
+        return {"status": "ok"}
+
+    grant_id = data.get("grant_id", "") or payload.get("data", {}).get("object", {}).get("grant_id", "")
+    message_data = data.get("object", data)
+    message_id = message_data.get("id", "")
+
+    if not grant_id or not message_id:
+        logger.warning("Nylas webhook missing grant_id or message_id")
+        return {"status": "ok"}
+
+    sb = get_supabase_admin()
+
+    # Look up the connection by grant_id
+    try:
+        conn_result = (
+            sb.table("email_connections")
+            .select("id, organisation_id, status")
+            .eq("grant_id", grant_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        logger.error("Failed to look up connection for grant %s: %s", grant_id, str(e))
+        return {"status": "ok"}
+
+    if not conn_result.data:
+        logger.warning("No connection found for grant_id %s", grant_id)
+        return {"status": "ok"}
+
+    connection = conn_result.data[0]
+
+    # Skip if connection is paused or disconnected
+    if connection["status"] != "active":
+        return {"status": "ok"}
+
+    org_id = connection["organisation_id"]
+    connection_id = connection["id"]
+
+    # Process in background
+    background_tasks.add_task(
+        process_nylas_message,
+        grant_id=grant_id,
+        message_id=message_id,
+        org_id=org_id,
+        connection_id=connection_id,
+    )
+
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Connection management
+# ---------------------------------------------------------------------------
+
+@router.get("/connections")
+async def list_connections(current_user: dict = Depends(get_current_user)):
+    """List all email connections for the user's organisation."""
+    sb = get_supabase_admin()
+    result = (
+        sb.table("email_connections")
+        .select("*")
+        .eq("organisation_id", current_user["organisation_id"])
+        .order("created_at")
+        .execute()
+    )
+    return {"connections": result.data}
+
+
+@router.post("/connections/{connection_id}/pause")
+async def pause_connection(
+    connection_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Pause an email connection (stop processing new messages)."""
+    sb = get_supabase_admin()
+    result = (
+        sb.table("email_connections")
+        .select("id")
+        .eq("id", connection_id)
+        .eq("organisation_id", current_user["organisation_id"])
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    sb.table("email_connections").update({
+        "status": "paused",
+        "updated_at": datetime.utcnow().isoformat(),
+    }).eq("id", connection_id).execute()
+    return {"status": "ok", "message": "Connection paused"}
+
+
+@router.post("/connections/{connection_id}/resume")
+async def resume_connection(
+    connection_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Resume a paused email connection."""
+    sb = get_supabase_admin()
+    result = (
+        sb.table("email_connections")
+        .select("id")
+        .eq("id", connection_id)
+        .eq("organisation_id", current_user["organisation_id"])
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    sb.table("email_connections").update({
+        "status": "active",
+        "error_message": None,
+        "updated_at": datetime.utcnow().isoformat(),
+    }).eq("id", connection_id).execute()
+    return {"status": "ok", "message": "Connection resumed"}
+
+
+@router.delete("/connections/{connection_id}")
+async def disconnect_connection(
+    connection_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Disconnect and remove an email connection."""
+    sb = get_supabase_admin()
+    result = (
+        sb.table("email_connections")
+        .select("id")
+        .eq("id", connection_id)
+        .eq("organisation_id", current_user["organisation_id"])
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    sb.table("email_connections").delete().eq("id", connection_id).execute()
+    return {"status": "ok", "message": "Connection removed"}
+
+
+# ---------------------------------------------------------------------------
+# Smart attachment filters
+# ---------------------------------------------------------------------------
+
+@router.get("/filters")
+async def list_filters(current_user: dict = Depends(get_current_user)):
+    """List attachment filter rules for the user's organisation."""
+    sb = get_supabase_admin()
+    result = (
+        sb.table("attachment_filters")
+        .select("*")
+        .eq("organisation_id", current_user["organisation_id"])
+        .order("created_at")
+        .execute()
+    )
+    return {"filters": result.data}
+
+
+@router.post("/filters")
+async def add_filter(
+    filter_type: str = Form(...),
+    filter_value: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Add a new attachment filter rule."""
+    valid_types = {"skip_content_type", "skip_filename_pattern", "skip_size_under", "skip_size_over"}
+    if filter_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid filter_type. Must be one of: {', '.join(valid_types)}")
+
+    sb = get_supabase_admin()
+    sb.table("attachment_filters").insert({
+        "id": str(uuid.uuid4()),
+        "organisation_id": current_user["organisation_id"],
+        "filter_type": filter_type,
+        "filter_value": filter_value.strip(),
+    }).execute()
+    return {"status": "ok", "message": "Filter added"}
+
+
+@router.delete("/filters/{filter_id}")
+async def remove_filter(
+    filter_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove an attachment filter rule."""
+    sb = get_supabase_admin()
+    sb.table("attachment_filters").delete().eq(
+        "id", filter_id
+    ).eq(
+        "organisation_id", current_user["organisation_id"]
+    ).execute()
+    return {"status": "ok", "message": "Filter removed"}
+
+
+@router.post("/filters/{filter_id}/toggle")
+async def toggle_filter(
+    filter_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Toggle a filter rule on/off."""
+    sb = get_supabase_admin()
+    result = (
+        sb.table("attachment_filters")
+        .select("id, is_active")
+        .eq("id", filter_id)
+        .eq("organisation_id", current_user["organisation_id"])
+        .single()
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Filter not found")
+
+    new_state = not result.data["is_active"]
+    sb.table("attachment_filters").update({
+        "is_active": new_state,
+    }).eq("id", filter_id).execute()
+    return {"status": "ok", "is_active": new_state}

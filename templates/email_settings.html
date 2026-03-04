@@ -9,184 +9,84 @@
         Back to Email Ingestions
     </a>
 
-    <!-- Section 1: Your Forwarding Address (hero dark card) -->
-    <div class="bg-neutral-950 rounded-xl p-8 mb-6">
-        <h1 class="text-xl font-semibold text-white">Your Document Inbox</h1>
-        <p class="text-sm text-neutral-400 mt-2">Forward emails to this address. Every attachment is automatically extracted, classified, and filed.</p>
-        <div class="flex items-center justify-between bg-neutral-800 rounded-lg px-4 py-3 mt-4">
-            <code id="forwarding-address" class="text-lg font-mono text-white">Loading...</code>
-            <button onclick="copyForwardingAddress(this)" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg px-3 py-2 transition-colors inline-flex items-center gap-2 text-sm flex-shrink-0 ml-3">
-                <i data-lucide="copy" class="w-4 h-4"></i>
-                <span>Copy</span>
-            </button>
+    <!-- Section 1: Connect Email (hero dark card) -->
+    <div id="connect-section" class="bg-neutral-950 rounded-xl p-8 mb-6">
+        <h1 class="text-xl font-semibold text-white">Connect Your Email</h1>
+        <p class="text-sm text-neutral-400 mt-2">One click to connect. Every attachment is automatically extracted, classified, and filed.</p>
+
+        <!-- Connected accounts list (hidden until loaded) -->
+        <div id="connected-accounts" class="mt-6 hidden">
+            <div id="accounts-list" class="space-y-3"></div>
         </div>
-        <p class="text-xs text-neutral-500 mt-3">This address is unique to your organisation. Only emails from whitelisted senders will be processed.</p>
+
+        <!-- Connect buttons -->
+        <div id="connect-buttons" class="flex flex-col sm:flex-row gap-3 mt-6">
+            <a href="/api/email/nylas/connect?provider=google"
+                class="bg-white text-neutral-950 hover:bg-neutral-100 px-5 py-3 rounded-lg text-sm font-semibold transition-colors inline-flex items-center justify-center gap-3">
+                <svg class="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Connect Gmail
+            </a>
+            <a href="/api/email/nylas/connect?provider=microsoft"
+                class="bg-white text-neutral-950 hover:bg-neutral-100 px-5 py-3 rounded-lg text-sm font-semibold transition-colors inline-flex items-center justify-center gap-3">
+                <svg class="w-5 h-5" viewBox="0 0 23 23"><rect x="1" y="1" width="10" height="10" fill="#f25022"/><rect x="12" y="1" width="10" height="10" fill="#7fba00"/><rect x="1" y="12" width="10" height="10" fill="#00a4ef"/><rect x="12" y="12" width="10" height="10" fill="#ffb900"/></svg>
+                Connect Outlook
+            </a>
+        </div>
     </div>
 
-    <!-- Section 2: Setup Instructions (tabbed) -->
-    <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden mb-6">
-        <!-- Tab bar -->
-        <div class="flex border-b border-neutral-200">
-            <button onclick="switchTab('gmail')" id="tab-gmail" class="px-6 py-3 text-sm font-medium border-b-2 border-neutral-950 text-neutral-950 transition-colors">Gmail</button>
-            <button onclick="switchTab('outlook')" id="tab-outlook" class="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 transition-colors">Outlook / Microsoft 365</button>
-            <button onclick="switchTab('other')" id="tab-other" class="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 transition-colors">Other</button>
-        </div>
-
-        <!-- Gmail Tab -->
-        <div id="panel-gmail" class="px-6 py-6">
-            <h2 class="text-lg font-semibold text-neutral-950">Set up auto-forwarding in Gmail</h2>
-            <div class="space-y-6 mt-5">
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Open Gmail Settings</p>
-                        <p class="text-sm text-neutral-600 mt-1">Click the gear icon in the top right of Gmail, then click "See all settings".</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Go to Forwarding and POP/IMAP</p>
-                        <p class="text-sm text-neutral-600 mt-1">Click the "Forwarding and POP/IMAP" tab at the top of the settings page.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Add a forwarding address</p>
-                        <p class="text-sm text-neutral-600 mt-1">Click "Add a forwarding address" and paste your Full Capacity address:</p>
-                        <div class="inline-flex items-center gap-2 mt-2">
-                            <code id="gmail-address" class="bg-neutral-100 text-neutral-800 font-mono text-sm px-2 py-1 rounded">Loading...</code>
-                            <button onclick="copyForwardingAddress(this)" class="text-neutral-500 hover:text-neutral-800 transition-colors">
-                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Confirm the forwarding address</p>
-                        <p class="text-sm text-neutral-600 mt-1">Gmail will send a confirmation code to verify the address. This may take a few minutes. Once received, check your Email dashboard for the confirmation email.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">5</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Enable forwarding</p>
-                        <p class="text-sm text-neutral-600 mt-1">Go back to Settings, then Forwarding and POP/IMAP. Select "Forward a copy of incoming mail to" and choose your Full Capacity address. We recommend selecting "keep Gmail's copy in the Inbox" so you still have your emails.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">6</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Optional: Filter specific emails</p>
-                        <p class="text-sm text-neutral-600 mt-1">If you only want to forward certain emails (e.g., from specific senders or with attachments), create a Gmail filter: Settings, then Filters, then Create a new filter. Set your conditions, then choose "Forward it to" your Full Capacity address.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-neutral-50 border border-neutral-200 rounded-lg p-4 mt-6 flex gap-3">
-                <i data-lucide="info" class="w-4 h-4 text-neutral-400 flex-shrink-0 mt-0.5"></i>
-                <p class="text-sm text-neutral-600">Tip: For the best results, create a Gmail filter that forwards only emails with attachments. This prevents newsletters and other noise from being processed.</p>
+    <!-- Section 2: Smart Filtering -->
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="filter" class="w-4 h-4 text-neutral-400"></i>
+                <h2 class="text-sm font-semibold text-neutral-950">Smart Filtering</h2>
             </div>
         </div>
+        <p class="text-sm text-neutral-500 mb-4">Automatically skip email signatures, logos, tracking pixels, and other non-document attachments. Built-in rules handle most cases. Add custom rules below.</p>
 
-        <!-- Outlook Tab -->
-        <div id="panel-outlook" class="px-6 py-6 hidden">
-            <h2 class="text-lg font-semibold text-neutral-950">Set up auto-forwarding in Outlook / Microsoft 365</h2>
-            <div class="space-y-6 mt-5">
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Open Outlook Settings</p>
-                        <p class="text-sm text-neutral-600 mt-1">Click the gear icon in the top right, then "View all Outlook settings" at the bottom.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Go to Mail, then Forwarding</p>
-                        <p class="text-sm text-neutral-600 mt-1">In the left sidebar, click "Mail", then click "Forwarding".</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Enable forwarding</p>
-                        <p class="text-sm text-neutral-600 mt-1">Check "Enable forwarding". Paste your Full Capacity address in the "Forward my email to" field:</p>
-                        <div class="inline-flex items-center gap-2 mt-2">
-                            <code id="outlook-address" class="bg-neutral-100 text-neutral-800 font-mono text-sm px-2 py-1 rounded">Loading...</code>
-                            <button onclick="copyForwardingAddress(this)" class="text-neutral-500 hover:text-neutral-800 transition-colors">
-                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Keep a copy (recommended)</p>
-                        <p class="text-sm text-neutral-600 mt-1">Check "Keep a copy of forwarded messages" so your Outlook inbox stays intact.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">5</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Save</p>
-                        <p class="text-sm text-neutral-600 mt-1">Click "Save" at the bottom. Forwarding starts immediately -- no confirmation step needed.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">6</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Optional: Use Rules for selective forwarding</p>
-                        <p class="text-sm text-neutral-600 mt-1">To forward only specific emails, go to Mail, then Rules, then Add new rule. Set conditions (e.g., "has attachments", "from specific people") and set the action to "Forward to" your Full Capacity address.</p>
-                    </div>
-                </div>
-            </div>
+        <!-- Built-in rules summary -->
+        <div class="bg-neutral-50 border border-neutral-200 rounded-lg p-4 mb-4">
+            <p class="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Built-in rules (always active)</p>
+            <ul class="space-y-1.5 text-sm text-neutral-600">
+                <li class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-neutral-400"></i>Skip inline/embedded images</li>
+                <li class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-neutral-400"></i>Skip tracking pixels and spacer images (&lt; 2 KB)</li>
+                <li class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-neutral-400"></i>Skip email signature images (logo.png, banner.jpg, etc.)</li>
+                <li class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-neutral-400"></i>Skip calendar invites, HTML parts, and icons</li>
+            </ul>
         </div>
 
-        <!-- Other Tab -->
-        <div id="panel-other" class="px-6 py-6 hidden">
-            <h2 class="text-lg font-semibold text-neutral-950">Set up forwarding with another email provider</h2>
-            <p class="text-sm text-neutral-600 mt-3">Most email providers support auto-forwarding. The general steps are:</p>
-            <div class="space-y-6 mt-5">
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Find the forwarding or rules settings</p>
-                        <p class="text-sm text-neutral-600 mt-1">Look for "Forwarding", "Rules", or "Filters" in your email provider's settings.</p>
-                    </div>
+        <!-- Custom rules -->
+        <div class="mb-3">
+            <p class="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Custom rules</p>
+            <div class="flex items-end gap-3">
+                <div class="flex-1">
+                    <label class="text-xs text-neutral-500 mb-1 block">Type</label>
+                    <select id="filter-type" class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white">
+                        <option value="skip_content_type">Skip content type</option>
+                        <option value="skip_filename_pattern">Skip filename pattern</option>
+                        <option value="skip_size_under">Skip files smaller than (bytes)</option>
+                        <option value="skip_size_over">Skip files larger than (bytes)</option>
+                    </select>
                 </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Add your Full Capacity address as a forwarding destination</p>
-                        <div class="inline-flex items-center gap-2 mt-2">
-                            <code id="other-address" class="bg-neutral-100 text-neutral-800 font-mono text-sm px-2 py-1 rounded">Loading...</code>
-                            <button onclick="copyForwardingAddress(this)" class="text-neutral-500 hover:text-neutral-800 transition-colors">
-                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </div>
-                    </div>
+                <div class="flex-1">
+                    <label class="text-xs text-neutral-500 mb-1 block">Value</label>
+                    <input type="text" id="filter-value" placeholder="e.g. image/*, *.exe, 1024"
+                        class="w-full h-10 text-sm rounded-lg border border-neutral-200 px-3 focus:outline-none focus:ring-2 focus:ring-neutral-300 bg-white"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();addFilter();}">
                 </div>
-                <div class="flex gap-4">
-                    <div class="w-7 h-7 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
-                    <div>
-                        <p class="font-medium text-neutral-900">Choose whether to forward all emails or create a rule</p>
-                        <p class="text-sm text-neutral-600 mt-1">We recommend forwarding emails with attachments only to reduce noise.</p>
-                    </div>
-                </div>
+                <button onclick="addFilter()"
+                    class="bg-neutral-950 text-white px-4 h-10 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors flex-shrink-0">
+                    Add
+                </button>
             </div>
-            <div class="bg-neutral-50 border border-neutral-200 rounded-lg p-4 mt-6 flex gap-3">
-                <i data-lucide="info" class="w-4 h-4 text-neutral-400 flex-shrink-0 mt-0.5"></i>
-                <p class="text-sm text-neutral-600">If you need help setting up forwarding with your specific email provider, contact us at support@fullcapacity.ai</p>
-            </div>
+        </div>
+        <div id="filter-entries" class="space-y-2">
+            <p class="text-neutral-400 text-sm">Loading...</p>
         </div>
     </div>
 
     <!-- Section 3: Sender Whitelist -->
-    <div class="bg-white border border-neutral-200 rounded-xl p-6 mb-6 card-hover">
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
         <div class="flex items-center gap-2 mb-2">
             <i data-lucide="shield" class="w-4 h-4 text-neutral-400"></i>
             <h2 class="text-sm font-semibold text-neutral-950">Approved Senders</h2>
@@ -209,7 +109,7 @@
     </div>
 
     <!-- Section 4: Connection Status -->
-    <div class="bg-white border border-neutral-200 rounded-xl p-6 card-hover">
+    <div class="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
         <h2 class="text-lg font-semibold text-neutral-950 mb-4">Connection Status</h2>
         <div id="status-section">
             <div class="flex items-center gap-2">
@@ -224,17 +124,111 @@
                 </dl>
             </div>
             <div id="status-waiting" class="mt-3 hidden">
-                <p class="text-sm text-neutral-500">Send a test email with an attachment to your forwarding address to verify the connection.</p>
-            </div>
-            <div class="mt-4">
-                <a id="test-mailto" href="#"
-                    class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
-                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                    Send Test Email
-                </a>
+                <p class="text-sm text-neutral-500">Connect an email account above, or set up forwarding below, to start receiving emails.</p>
             </div>
         </div>
     </div>
+
+    <!-- Section 5: Email Forwarding (collapsible) -->
+    <details class="bg-white border border-neutral-200 rounded-xl overflow-hidden mb-6">
+        <summary class="px-6 py-4 cursor-pointer hover:bg-neutral-50 transition-colors flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i data-lucide="mail-forward" class="w-4 h-4 text-neutral-400"></i>
+                <h2 class="text-sm font-semibold text-neutral-950">Manual Email Forwarding</h2>
+            </div>
+            <span class="text-xs text-neutral-400">Alternative to one-click connection</span>
+        </summary>
+
+        <div class="border-t border-neutral-200">
+            <!-- Forwarding address display -->
+            <div class="px-6 py-4 bg-neutral-50">
+                <p class="text-xs text-neutral-500 mb-2">Your forwarding address</p>
+                <div class="flex items-center justify-between bg-white border border-neutral-200 rounded-lg px-4 py-3">
+                    <code id="forwarding-address" class="text-sm font-mono text-neutral-800">Loading...</code>
+                    <button onclick="copyForwardingAddress(this)" class="bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 text-xs flex-shrink-0 ml-3">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab bar -->
+            <div class="flex border-b border-neutral-200">
+                <button onclick="switchTab('gmail')" id="tab-gmail" class="px-6 py-3 text-sm font-medium border-b-2 border-neutral-950 text-neutral-950 transition-colors">Gmail</button>
+                <button onclick="switchTab('outlook')" id="tab-outlook" class="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 transition-colors">Outlook</button>
+                <button onclick="switchTab('other')" id="tab-other" class="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 transition-colors">Other</button>
+            </div>
+
+            <!-- Gmail Tab -->
+            <div id="panel-gmail" class="px-6 py-6">
+                <h3 class="text-base font-semibold text-neutral-950">Set up auto-forwarding in Gmail</h3>
+                <div class="space-y-5 mt-4">
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Open Gmail Settings</p>
+                            <p class="text-sm text-neutral-600 mt-1">Click the gear icon, then "See all settings".</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Go to "Forwarding and POP/IMAP"</p>
+                            <p class="text-sm text-neutral-600 mt-1">Click the tab at the top of settings.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Add a forwarding address</p>
+                            <p class="text-sm text-neutral-600 mt-1">Click "Add a forwarding address" and paste your Full Capacity address. Confirm when prompted.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Enable forwarding</p>
+                            <p class="text-sm text-neutral-600 mt-1">Select "Forward a copy of incoming mail to" and choose your Full Capacity address. Keep Gmail's copy in the Inbox.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outlook Tab -->
+            <div id="panel-outlook" class="px-6 py-6 hidden">
+                <h3 class="text-base font-semibold text-neutral-950">Set up auto-forwarding in Outlook / Microsoft 365</h3>
+                <div class="space-y-5 mt-4">
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Open Outlook Settings</p>
+                            <p class="text-sm text-neutral-600 mt-1">Click the gear icon, then "View all Outlook settings".</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Go to Mail, then Forwarding</p>
+                            <p class="text-sm text-neutral-600 mt-1">In the sidebar, click "Mail", then "Forwarding".</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-6 h-6 rounded-full bg-neutral-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+                        <div>
+                            <p class="font-medium text-neutral-900 text-sm">Enable forwarding</p>
+                            <p class="text-sm text-neutral-600 mt-1">Check "Enable forwarding", paste your Full Capacity address, and check "Keep a copy of forwarded messages".</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Tab -->
+            <div id="panel-other" class="px-6 py-6 hidden">
+                <h3 class="text-base font-semibold text-neutral-950">Set up forwarding with another email provider</h3>
+                <p class="text-sm text-neutral-600 mt-2">Find "Forwarding" or "Rules" in your email provider's settings and add your Full Capacity address as a forwarding destination. We recommend forwarding only emails with attachments.</p>
+            </div>
+        </div>
+    </details>
 </div>
 {% endblock %}
 
@@ -254,12 +248,123 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('page-title').textContent = 'Email Settings';
     setActiveNav('nav-email');
     loadStatus();
+    loadConnections();
     loadWhitelist();
-    // Auto-refresh status every 30 seconds
+    loadFilters();
+    // Check for success/error params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === '1') {
+        showAlert('Email account connected successfully', 'success');
+    }
+    if (params.get('error')) {
+        const errorMap = {
+            'no_code': 'Authorization failed -- no code received',
+            'no_state': 'Authorization failed -- missing state',
+            'token_exchange': 'Failed to connect account -- please try again',
+            'no_grant': 'Failed to obtain access -- please try again',
+        };
+        showAlert(errorMap[params.get('error')] || 'Connection failed', 'error');
+    }
     setInterval(loadStatus, 30000);
 });
 
-// Load forwarding status and address
+// ---------------------------------------------------------------------------
+// Connections
+// ---------------------------------------------------------------------------
+
+async function loadConnections() {
+    try {
+        const res = await fetch('/api/email/connections');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderConnections(data.connections || []);
+    } catch (err) {
+        console.error('Failed to load connections:', err);
+    }
+}
+
+function renderConnections(connections) {
+    const list = document.getElementById('accounts-list');
+    const container = document.getElementById('connected-accounts');
+    const buttons = document.getElementById('connect-buttons');
+
+    if (!connections || connections.length === 0) {
+        container.classList.add('hidden');
+        buttons.classList.remove('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+
+    const providerIcons = {
+        google: '<svg class="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>',
+        microsoft: '<svg class="w-5 h-5" viewBox="0 0 23 23"><rect x="1" y="1" width="10" height="10" fill="#f25022"/><rect x="12" y="1" width="10" height="10" fill="#7fba00"/><rect x="1" y="12" width="10" height="10" fill="#00a4ef"/><rect x="12" y="12" width="10" height="10" fill="#ffb900"/></svg>',
+    };
+
+    const statusColors = {
+        active: 'bg-neutral-950',
+        paused: 'bg-amber-400',
+        error: 'bg-red-500',
+        disconnected: 'bg-neutral-300',
+    };
+
+    list.innerHTML = connections.map(function(conn) {
+        const icon = providerIcons[conn.provider] || '<i data-lucide="mail" class="w-5 h-5 text-neutral-400"></i>';
+        const dotColor = statusColors[conn.status] || 'bg-neutral-300';
+        const isPaused = conn.status === 'paused';
+        const lastSync = conn.last_sync_at ? timeAgo(conn.last_sync_at) : 'Never';
+
+        return '<div class="flex items-center justify-between bg-neutral-800 rounded-lg px-4 py-3">' +
+            '<div class="flex items-center gap-3 min-w-0">' +
+                icon +
+                '<div class="min-w-0">' +
+                    '<p class="text-sm font-medium text-white truncate">' + escapeHtml(conn.email_address) + '</p>' +
+                    '<div class="flex items-center gap-2 mt-0.5">' +
+                        '<div class="w-1.5 h-1.5 rounded-full ' + dotColor + '"></div>' +
+                        '<span class="text-xs text-neutral-400">' + conn.status + ' -- Last sync: ' + lastSync + '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-2 ml-3 flex-shrink-0">' +
+                (isPaused
+                    ? '<button onclick="resumeConnection(\'' + conn.id + '\')" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg px-3 py-1.5 text-xs transition-colors">Resume</button>'
+                    : '<button onclick="pauseConnection(\'' + conn.id + '\')" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg px-3 py-1.5 text-xs transition-colors">Pause</button>'
+                ) +
+                '<button onclick="disconnectConnection(\'' + conn.id + '\')" class="bg-neutral-700 hover:bg-red-600 text-white rounded-lg px-2.5 py-1.5 text-xs transition-colors">' +
+                    '<i data-lucide="x" class="w-3.5 h-3.5"></i>' +
+                '</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function pauseConnection(id) {
+    try {
+        await fetch('/api/email/connections/' + id + '/pause', { method: 'POST' });
+        loadConnections();
+    } catch (err) { console.error(err); }
+}
+
+async function resumeConnection(id) {
+    try {
+        await fetch('/api/email/connections/' + id + '/resume', { method: 'POST' });
+        loadConnections();
+    } catch (err) { console.error(err); }
+}
+
+async function disconnectConnection(id) {
+    if (!confirm('Disconnect this email account? New emails from this account will no longer be processed.')) return;
+    try {
+        await fetch('/api/email/connections/' + id, { method: 'DELETE' });
+        loadConnections();
+    } catch (err) { console.error(err); }
+}
+
+// ---------------------------------------------------------------------------
+// Status
+// ---------------------------------------------------------------------------
+
 async function loadStatus() {
     try {
         const res = await fetch('/api/email/status');
@@ -267,24 +372,9 @@ async function loadStatus() {
         const data = await res.json();
 
         forwardingAddress = data.forwarding_address || '';
+        const addrEl = document.getElementById('forwarding-address');
+        if (addrEl) addrEl.textContent = forwardingAddress;
 
-        // Update all address displays
-        document.getElementById('forwarding-address').textContent = forwardingAddress;
-        const addrEls = ['gmail-address', 'outlook-address', 'other-address'];
-        addrEls.forEach(function(id) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = forwardingAddress;
-        });
-
-        // Update mailto link
-        const mailto = document.getElementById('test-mailto');
-        if (mailto) {
-            mailto.href = 'mailto:' + encodeURIComponent(forwardingAddress)
-                + '?subject=' + encodeURIComponent('Full Capacity Test Email')
-                + '&body=' + encodeURIComponent('This is a test email to verify Full Capacity email ingestion is working.');
-        }
-
-        // Update status indicator
         const dot = document.getElementById('status-dot');
         const text = document.getElementById('status-text');
         const details = document.getElementById('status-details');
@@ -306,7 +396,6 @@ async function loadStatus() {
             details.classList.add('hidden');
             waiting.classList.remove('hidden');
         }
-
     } catch (err) {
         console.error('Failed to load email status:', err);
     }
@@ -324,12 +413,15 @@ function timeAgo(dateStr) {
     return then.toLocaleDateString();
 }
 
-// Tab switching
+// ---------------------------------------------------------------------------
+// Tab switching (forwarding guide)
+// ---------------------------------------------------------------------------
+
 function switchTab(tab) {
-    const tabs = ['gmail', 'outlook', 'other'];
+    var tabs = ['gmail', 'outlook', 'other'];
     tabs.forEach(function(t) {
-        const tabBtn = document.getElementById('tab-' + t);
-        const panel = document.getElementById('panel-' + t);
+        var tabBtn = document.getElementById('tab-' + t);
+        var panel = document.getElementById('panel-' + t);
         if (t === tab) {
             tabBtn.className = 'px-6 py-3 text-sm font-medium border-b-2 border-neutral-950 text-neutral-950 transition-colors';
             panel.classList.remove('hidden');
@@ -340,22 +432,24 @@ function switchTab(tab) {
     });
 }
 
+// ---------------------------------------------------------------------------
 // Copy to clipboard
+// ---------------------------------------------------------------------------
+
 async function copyForwardingAddress(btnEl) {
-    const addr = forwardingAddress || document.getElementById('forwarding-address').textContent;
+    var addr = forwardingAddress || document.getElementById('forwarding-address').textContent;
     try {
         await navigator.clipboard.writeText(addr);
     } catch (e) {
-        // Fallback for older browsers
-        const ta = document.createElement('textarea');
+        var ta = document.createElement('textarea');
         ta.value = addr;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
     }
-    const originalHTML = btnEl.innerHTML;
-    btnEl.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> <span>Copied</span>';
+    var originalHTML = btnEl.innerHTML;
+    btnEl.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> <span>Copied</span>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
     setTimeout(function() {
         btnEl.innerHTML = originalHTML;
@@ -363,12 +457,15 @@ async function copyForwardingAddress(btnEl) {
     }, 2000);
 }
 
+// ---------------------------------------------------------------------------
 // Whitelist
+// ---------------------------------------------------------------------------
+
 async function loadWhitelist() {
     try {
-        const res = await fetch('/api/email/whitelist');
+        var res = await fetch('/api/email/whitelist');
         if (!res.ok) return;
-        const data = await res.json();
+        var data = await res.json();
         renderWhitelist(data.entries || []);
     } catch (err) {
         console.error('Failed to load whitelist:', err);
@@ -376,7 +473,7 @@ async function loadWhitelist() {
 }
 
 function renderWhitelist(entries) {
-    const container = document.getElementById('whitelist-entries');
+    var container = document.getElementById('whitelist-entries');
     if (!entries || entries.length === 0) {
         container.innerHTML = '<p class="text-neutral-400 text-sm">No approved senders configured. All senders are currently accepted.</p>';
         return;
@@ -396,35 +493,101 @@ function renderWhitelist(entries) {
 }
 
 async function addWhitelistEntry() {
-    const input = document.getElementById('whitelist-input');
-    const value = input.value.trim();
+    var input = document.getElementById('whitelist-input');
+    var value = input.value.trim();
     if (!value) return;
-
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append('address_or_domain', value);
-
     try {
-        const res = await fetch('/api/email/whitelist', { method: 'POST', body: formData });
-        if (res.ok) {
-            input.value = '';
-            loadWhitelist();
-        } else {
-            showAlert('Failed to add approved sender', 'error');
-        }
-    } catch (err) {
-        showAlert('Failed to add: ' + err.message, 'error');
-    }
+        var res = await fetch('/api/email/whitelist', { method: 'POST', body: formData });
+        if (res.ok) { input.value = ''; loadWhitelist(); }
+        else { showAlert('Failed to add approved sender', 'error'); }
+    } catch (err) { showAlert('Failed to add: ' + err.message, 'error'); }
 }
 
 async function removeWhitelistEntry(id) {
     try {
-        const res = await fetch('/api/email/whitelist/' + id, { method: 'DELETE' });
-        if (res.ok) {
-            loadWhitelist();
-        }
+        var res = await fetch('/api/email/whitelist/' + id, { method: 'DELETE' });
+        if (res.ok) loadWhitelist();
+    } catch (err) { console.error(err); }
+}
+
+// ---------------------------------------------------------------------------
+// Smart filters
+// ---------------------------------------------------------------------------
+
+async function loadFilters() {
+    try {
+        var res = await fetch('/api/email/filters');
+        if (!res.ok) return;
+        var data = await res.json();
+        renderFilters(data.filters || []);
     } catch (err) {
-        console.error('Failed to remove whitelist entry:', err);
+        console.error('Failed to load filters:', err);
     }
+}
+
+function renderFilters(filters) {
+    var container = document.getElementById('filter-entries');
+    if (!filters || filters.length === 0) {
+        container.innerHTML = '<p class="text-neutral-400 text-sm">No custom filter rules. Built-in rules are active.</p>';
+        return;
+    }
+
+    var typeLabels = {
+        skip_content_type: 'Content type',
+        skip_filename_pattern: 'Filename pattern',
+        skip_size_under: 'Min size (bytes)',
+        skip_size_over: 'Max size (bytes)',
+    };
+
+    container.innerHTML = filters.map(function(f) {
+        var label = typeLabels[f.filter_type] || f.filter_type;
+        var activeClass = f.is_active ? 'bg-neutral-950 text-white' : 'bg-neutral-200 text-neutral-500';
+        var toggleLabel = f.is_active ? 'On' : 'Off';
+        return '<div class="flex items-center justify-between p-3 rounded-lg border border-neutral-100">' +
+            '<div class="flex items-center gap-3">' +
+                '<button onclick="toggleFilter(\'' + f.id + '\')" class="px-2 py-0.5 rounded text-xs font-medium ' + activeClass + ' transition-colors">' + toggleLabel + '</button>' +
+                '<div>' +
+                    '<span class="text-xs text-neutral-400">' + escapeHtml(label) + '</span>' +
+                    '<p class="text-sm text-neutral-700 font-mono">' + escapeHtml(f.filter_value) + '</p>' +
+                '</div>' +
+            '</div>' +
+            '<button onclick="removeFilter(\'' + f.id + '\')" class="text-neutral-400 hover:text-red-600 transition-colors">' +
+                '<i data-lucide="x" class="w-4 h-4"></i>' +
+            '</button>' +
+        '</div>';
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function addFilter() {
+    var typeEl = document.getElementById('filter-type');
+    var valueEl = document.getElementById('filter-value');
+    var value = valueEl.value.trim();
+    if (!value) return;
+    var formData = new FormData();
+    formData.append('filter_type', typeEl.value);
+    formData.append('filter_value', value);
+    try {
+        var res = await fetch('/api/email/filters', { method: 'POST', body: formData });
+        if (res.ok) { valueEl.value = ''; loadFilters(); }
+        else { showAlert('Failed to add filter', 'error'); }
+    } catch (err) { showAlert('Failed to add filter: ' + err.message, 'error'); }
+}
+
+async function removeFilter(id) {
+    try {
+        var res = await fetch('/api/email/filters/' + id, { method: 'DELETE' });
+        if (res.ok) loadFilters();
+    } catch (err) { console.error(err); }
+}
+
+async function toggleFilter(id) {
+    try {
+        var res = await fetch('/api/email/filters/' + id + '/toggle', { method: 'POST' });
+        if (res.ok) loadFilters();
+    } catch (err) { console.error(err); }
 }
 </script>
 {% endblock %}

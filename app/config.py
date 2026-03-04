@@ -17,6 +17,12 @@ class Settings:
     TELEGRAM_WEBHOOK_SECRET: str = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
     EMAIL_WEBHOOK_SECRET: str = os.getenv("EMAIL_WEBHOOK_SECRET", "")
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
+    NYLAS_API_KEY: str = os.getenv("NYLAS_API_KEY", "")
+    NYLAS_API_URI: str = os.getenv("NYLAS_API_URI", "https://api.us.nylas.com")
+    NYLAS_CLIENT_ID: str = os.getenv("NYLAS_CLIENT_ID", "")
+    NYLAS_CLIENT_SECRET: str = os.getenv("NYLAS_CLIENT_SECRET", "")
+    NYLAS_WEBHOOK_SECRET: str = os.getenv("NYLAS_WEBHOOK_SECRET", "")
+    NYLAS_CALLBACK_URI: str = os.getenv("NYLAS_CALLBACK_URI", "")
 
 
 settings = Settings()
