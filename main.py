@@ -52,20 +52,14 @@ async def lifespan(app: FastAPI):
     else:
         print("[STARTUP] WARNING: ANTHROPIC_API_KEY is empty!", flush=True)
 
-    # Start IMAP polling background task
-    import asyncio
-    from app.email.imap_scheduler import imap_polling_loop
-    polling_task = asyncio.create_task(imap_polling_loop())
-    print("[STARTUP] IMAP polling background task started", flush=True)
+    # IMAP polling disabled -- forwarding-based ingestion is primary.
+    # Keeping code for future OAuth-based IMAP support.
+    # import asyncio
+    # from app.email.imap_scheduler import imap_polling_loop
+    # polling_task = asyncio.create_task(imap_polling_loop())
+    # print("[STARTUP] IMAP polling background task started", flush=True)
 
     yield
-
-    # Cleanup: cancel polling task on shutdown
-    polling_task.cancel()
-    try:
-        await polling_task
-    except asyncio.CancelledError:
-        pass
 
 
 app = FastAPI(

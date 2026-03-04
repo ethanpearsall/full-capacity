@@ -95,11 +95,19 @@ def get_file_extension(filename: str) -> str:
     return ""
 
 
+def _slug_from_name(name: str) -> str:
+    """Generate a URL-safe slug from an organisation name."""
+    slug = name.lower().strip()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    return slug or "default"
+
+
 async def resolve_organisation(to_address: str, sender_email: str) -> Optional[str]:
     """Determine which organisation an inbound email belongs to.
 
     Strategy:
-    1. Parse TO address for org slug (e.g. clientname@parse.fullcapacity.ai)
+    1. Parse TO address for org slug (e.g. docs-mycompany@inbound.fullcapacity.ai)
     2. Look up sender in whitelist
     3. Look up sender as a known user
     """
@@ -108,13 +116,25 @@ async def resolve_organisation(to_address: str, sender_email: str) -> Optional[s
     # Strategy 1: Parse TO address for org slug
     if to_address:
         local_part = to_address.split("@")[0].lower() if "@" in to_address else ""
-        if local_part and local_part != "docs":
-            # Try matching org by name/slug
+        # Support docs-{slug} format (primary) and plain {slug} format (fallback)
+        slug = ""
+        if local_part.startswith("docs-"):
+            slug = local_part[5:]  # strip "docs-" prefix
+        elif local_part and local_part != "docs":
+            slug = local_part
+
+        if slug:
             try:
+                # Fetch all orgs and match by slug derived from name
+                orgs_result = sb.table("organisations").select("id, name").execute()
+                for org in (orgs_result.data or []):
+                    if _slug_from_name(org.get("name", "")) == slug:
+                        return org["id"]
+                # Fallback: fuzzy match by name containing the slug
                 result = (
                     sb.table("organisations")
                     .select("id")
-                    .ilike("name", f"%{local_part}%")
+                    .ilike("name", f"%{slug}%")
                     .limit(1)
                     .execute()
                 )

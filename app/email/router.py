@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import uuid
 from datetime import date, datetime
 from typing import Optional
@@ -21,13 +22,11 @@ from app.config import settings
 from app.database import get_supabase_admin
 from app.email.helpers import (
     check_duplicate_email,
-    encrypt_password,
     extract_header,
     parse_email_address,
     resolve_organisation,
 )
 from app.email.processor import (
-    poll_imap_mailbox,
     process_email_attachments,
 )
 
@@ -37,6 +36,20 @@ templates = Jinja2Templates(directory="templates")
 
 # Webhook secret for SendGrid verification
 EMAIL_WEBHOOK_SECRET = getattr(settings, "EMAIL_WEBHOOK_SECRET", "")
+
+
+def _generate_org_slug(org_name: str) -> str:
+    """Generate a URL-safe slug from an organisation name."""
+    slug = org_name.lower().strip()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    return slug or "default"
+
+
+def _get_forwarding_address(org_name: str) -> str:
+    """Build the forwarding address for an organisation."""
+    slug = _generate_org_slug(org_name)
+    return f"docs-{slug}@inbound.fullcapacity.ai"
 
 
 # ---------------------------------------------------------------------------
@@ -188,147 +201,6 @@ async def receive_email_webhook(
 
 
 # ---------------------------------------------------------------------------
-# IMAP configuration
-# ---------------------------------------------------------------------------
-
-@router.get("/imap/config")
-async def get_imap_config_endpoint(current_user: dict = Depends(get_current_user)):
-    """Get IMAP configuration for the user's organisation."""
-    sb = get_supabase_admin()
-    org_id = current_user["organisation_id"]
-
-    result = (
-        sb.table("imap_configs")
-        .select("*")
-        .eq("organisation_id", org_id)
-        .limit(1)
-        .execute()
-    )
-
-    if not result.data:
-        return {}
-
-    config = result.data[0]
-    config["password_encrypted"] = "********" if config.get("password_encrypted") else ""
-    return config
-
-
-@router.post("/imap/config")
-async def save_imap_config_endpoint(
-    host: str = Form(...),
-    port: int = Form(993),
-    username: str = Form(...),
-    password: str = Form(...),
-    folder: str = Form("INBOX"),
-    use_ssl: bool = Form(True),
-    poll_interval_minutes: int = Form(5),
-    current_user: dict = Depends(get_current_user),
-):
-    """Save IMAP configuration. Validates connection first."""
-    import imaplib
-
-    # Test connection
-    try:
-        if use_ssl:
-            test_mail = imaplib.IMAP4_SSL(host, port)
-        else:
-            test_mail = imaplib.IMAP4(host, port)
-        test_mail.login(username, password)
-        test_mail.logout()
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Could not connect to IMAP server: {str(e)}",
-        )
-
-    sb = get_supabase_admin()
-    org_id = current_user["organisation_id"]
-    encrypted_pw = encrypt_password(password)
-
-    # Upsert config
-    existing = (
-        sb.table("imap_configs")
-        .select("id")
-        .eq("organisation_id", org_id)
-        .limit(1)
-        .execute()
-    )
-
-    config_data = {
-        "organisation_id": org_id,
-        "host": host,
-        "port": port,
-        "username": username,
-        "password_encrypted": encrypted_pw,
-        "folder": folder,
-        "use_ssl": use_ssl,
-        "poll_interval_minutes": poll_interval_minutes,
-        "is_active": True,
-        "updated_at": datetime.utcnow().isoformat(),
-    }
-
-    if existing.data:
-        sb.table("imap_configs").update(config_data).eq(
-            "id", existing.data[0]["id"]
-        ).execute()
-    else:
-        config_data["id"] = str(uuid.uuid4())
-        sb.table("imap_configs").insert(config_data).execute()
-
-    return {"status": "ok", "message": "IMAP configuration saved and verified"}
-
-
-@router.post("/imap/test")
-async def test_imap_connection(
-    host: str = Form(...),
-    port: int = Form(993),
-    username: str = Form(...),
-    password: str = Form(...),
-    use_ssl: bool = Form(True),
-    current_user: dict = Depends(get_current_user),
-):
-    """Test IMAP connection without saving."""
-    import imaplib
-
-    try:
-        if use_ssl:
-            test_mail = imaplib.IMAP4_SSL(host, port)
-        else:
-            test_mail = imaplib.IMAP4(host, port)
-        test_mail.login(username, password)
-        test_mail.logout()
-        return {"status": "ok", "message": "Connection successful"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@router.post("/imap/check")
-async def check_imap_mailbox(
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
-):
-    """Manually trigger an IMAP check for the user's organisation."""
-    sb = get_supabase_admin()
-    org_id = current_user["organisation_id"]
-
-    result = (
-        sb.table("imap_configs")
-        .select("*")
-        .eq("organisation_id", org_id)
-        .eq("is_active", True)
-        .limit(1)
-        .execute()
-    )
-
-    if not result.data:
-        raise HTTPException(status_code=400, detail="IMAP not configured")
-
-    config = result.data[0]
-    background_tasks.add_task(poll_imap_mailbox, config, org_id)
-    return {"status": "ok", "message": "IMAP check started"}
-
-
-# ---------------------------------------------------------------------------
 # Email ingestion list & detail API
 # ---------------------------------------------------------------------------
 
@@ -435,8 +307,6 @@ async def reprocess_email(
             "skip_reason": None,
         }).eq("id", att["id"]).execute()
 
-    # Re-trigger processing (we need the file content again from storage or original)
-    # For now, just reset status - a full reprocess would need stored files
     return {"status": "ok", "message": f"{len(attachments_result.data)} attachments queued for reprocessing"}
 
 
@@ -467,7 +337,7 @@ async def delete_email_ingestion(
 
 
 # ---------------------------------------------------------------------------
-# Stats
+# Stats & Status
 # ---------------------------------------------------------------------------
 
 @router.get("/stats")
@@ -476,7 +346,6 @@ async def get_email_stats(current_user: dict = Depends(get_current_user)):
     sb = get_supabase_admin()
     org_id = current_user["organisation_id"]
 
-    # All ingestions
     all_ingestions = (
         sb.table("email_ingestions")
         .select("id, status, received_at, attachment_count, processed_count")
@@ -506,6 +375,65 @@ async def get_email_stats(current_user: dict = Depends(get_current_user)):
         "attachments_processed": total_processed,
         "total_attachments": total_attachments,
         "success_rate": success_rate,
+    }
+
+
+@router.get("/status")
+async def get_email_forwarding_status(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get email forwarding status for the settings page."""
+    sb = get_supabase_admin()
+    org_id = current_user["organisation_id"]
+
+    # Resolve org name for forwarding address
+    org_data = current_user.get("organisations")
+    if isinstance(org_data, dict):
+        org_name = org_data.get("name", "")
+    else:
+        org_name = ""
+    if not org_name:
+        try:
+            org_result = sb.table("organisations").select("name").eq("id", org_id).single().execute()
+            org_name = org_result.data.get("name", "") if org_result.data else ""
+        except Exception:
+            org_name = ""
+
+    forwarding_address = _get_forwarding_address(org_name)
+
+    # Latest ingestion
+    try:
+        latest_result = (
+            sb.table("email_ingestions")
+            .select("received_at, from_address, subject")
+            .eq("organisation_id", org_id)
+            .order("received_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        latest = latest_result.data[0] if latest_result.data else None
+    except Exception:
+        latest = None
+
+    # Total count
+    try:
+        count_result = (
+            sb.table("email_ingestions")
+            .select("id")
+            .eq("organisation_id", org_id)
+            .execute()
+        )
+        total_count = len(count_result.data) if count_result.data else 0
+    except Exception:
+        total_count = 0
+
+    return {
+        "forwarding_address": forwarding_address,
+        "is_active": total_count > 0,
+        "total_emails_received": total_count,
+        "last_email_received": latest["received_at"] if latest else None,
+        "last_email_from": latest["from_address"] if latest else None,
+        "last_email_subject": latest["subject"] if latest else None,
     }
 
 

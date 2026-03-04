@@ -112,7 +112,28 @@ document.addEventListener('DOMContentLoaded', () => {
     setActiveNav('nav-email');
     loadStats();
     loadEmails();
+    loadForwardingAddress();
 });
+
+let _forwardingAddress = '';
+async function loadForwardingAddress() {
+    try {
+        const res = await fetch('/api/email/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        _forwardingAddress = data.forwarding_address || '';
+    } catch (err) {}
+}
+async function copyForwardingAddress() {
+    if (!_forwardingAddress) { await loadForwardingAddress(); }
+    if (!_forwardingAddress) return;
+    try { await navigator.clipboard.writeText(_forwardingAddress); } catch (e) {
+        const ta = document.createElement('textarea'); ta.value = _forwardingAddress;
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    const btn = document.getElementById('copy-btn-text');
+    if (btn) { btn.textContent = 'Copied'; setTimeout(function(){ btn.textContent = 'Copy Forwarding Address'; }, 2000); }
+}
 
 async function loadStats() {
     try {
@@ -170,9 +191,10 @@ function renderEmails(emails) {
         tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-12 text-center">' +
             '<i data-lucide="mail" class="w-16 h-16 text-neutral-300 mx-auto mb-3"></i>' +
             '<p class="text-neutral-500 text-sm font-medium mb-1">No emails ingested yet</p>' +
-            '<p class="text-neutral-400 text-xs mb-4">Forward emails with attachments to your dedicated address, or configure IMAP polling</p>' +
+            '<p class="text-neutral-400 text-xs mb-4">Set up email forwarding to start automatically filing documents from your inbox.</p>' +
             '<div class="flex items-center justify-center gap-3">' +
-            '<a href="/api/email/settings-page" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors">Configure IMAP</a>' +
+            '<a href="/api/email/settings-page" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors">Set Up Forwarding</a>' +
+            '<button onclick="copyForwardingAddress()" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span id="copy-btn-text">Copy Forwarding Address</span></button>' +
             '</div>' +
             '</td></tr>';
         if (typeof lucide !== 'undefined') lucide.createIcons();
