@@ -117,6 +117,14 @@
         </div>
     </div>
 </div>
+
+<!-- Recent Activity -->
+<div class="mt-6">
+    <h3 class="text-sm font-semibold text-neutral-950 mb-3">Recent Activity</h3>
+    <div class="bg-neutral-50 border border-neutral-200 rounded-xl p-4 space-y-3" id="activity-feed">
+        <div class="text-center py-4 text-neutral-400 text-xs">Loading...</div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -171,6 +179,7 @@ async function loadDocuments(params = '') {
         allDocs = data.documents || [];
         currentPage = 0;
         renderPage();
+        renderActivityFeed(allDocs.slice(0, 5));
         computeAvgConfidence(allDocs);
     } catch (err) {
         console.error('Failed to load documents:', err);
@@ -290,6 +299,52 @@ function renderDocuments(docs) {
         </tr>`;
     }).join('');
     lucide.createIcons();
+}
+
+// Activity feed
+function renderActivityFeed(docs) {
+    const container = document.getElementById('activity-feed');
+    if (!docs || docs.length === 0) {
+        container.innerHTML = '<div class="text-center py-4 text-neutral-400 text-xs">No recent activity</div>';
+        return;
+    }
+    container.innerHTML = docs.map(doc => {
+        const name = doc.filed_name || doc.original_filename || 'Untitled';
+        const time = doc.uploaded_at ? timeAgo(doc.uploaded_at) : '';
+        const statusLabel = doc.status === 'filed' ? 'Auto-filed' : doc.status === 'error' ? 'Error' : doc.status === 'processing' ? 'Processing' : 'Uploaded';
+        const folderPath = doc.folder_path || '';
+        let desc = `${name}`;
+        if (doc.status === 'filed' && folderPath) {
+            desc += ` filed to ${folderPath}`;
+        } else if (doc.status === 'error') {
+            desc += ` failed processing`;
+        }
+        const initial = name.charAt(0).toUpperCase();
+        const dotColor = doc.status === 'filed' ? 'bg-neutral-950' : doc.status === 'error' ? 'bg-red-500' : 'bg-neutral-300';
+
+        return `<div class="flex items-start gap-3">
+            <div class="relative flex-shrink-0">
+                <div class="w-8 h-8 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs font-medium">${initial}</div>
+                <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${dotColor} ring-2 ring-neutral-50"></div>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-neutral-700">${escapeHtml(statusLabel)}</p>
+                <p class="text-[13px] text-neutral-500 truncate">${escapeHtml(desc)}</p>
+                ${time ? `<p class="text-[12px] text-neutral-400">${time}</p>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function timeAgo(dateStr) {
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+    return then.toLocaleDateString();
 }
 
 // Search & filter
