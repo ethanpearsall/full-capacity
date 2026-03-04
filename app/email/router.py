@@ -521,10 +521,32 @@ async def nylas_callback(
     The state parameter contains the organisation ID.
     """
     from fastapi.responses import RedirectResponse
+    import urllib.parse
+
+    # Log full callback URL and all query parameters
+    logger.error(
+        "Nylas callback received -- URL: %s, Query params: %s",
+        str(request.url),
+        dict(request.query_params),
+    )
+
+    # Check for error parameter from Nylas
+    nylas_error = request.query_params.get("error", "")
+    nylas_error_description = request.query_params.get("error_description", "")
+    if nylas_error:
+        logger.error(
+            "Nylas OAuth error: %s, description: %s",
+            nylas_error,
+            nylas_error_description,
+        )
 
     if not code:
-        logger.warning("Nylas callback received without code")
-        return RedirectResponse(url="/api/email/settings-page?error=no_code", status_code=302)
+        error_msg = nylas_error_description or nylas_error or "no_code"
+        logger.error("Nylas callback received without code, redirecting with error: %s", error_msg)
+        return RedirectResponse(
+            url="/api/email/settings-page?error=" + urllib.parse.quote(error_msg),
+            status_code=302,
+        )
 
     org_id = state
     if not org_id:
