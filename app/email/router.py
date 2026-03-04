@@ -585,9 +585,12 @@ async def nylas_callback(
 # ---------------------------------------------------------------------------
 
 @router.get("/nylas/webhook")
-async def nylas_webhook_challenge(challenge: str = Query(...)):
+async def nylas_webhook_challenge(challenge: Optional[str] = Query(None)):
     """Respond to Nylas webhook challenge for verification."""
-    return challenge
+    if challenge is None:
+        return {"status": "ok"}
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(content=challenge)
 
 
 @router.post("/nylas/webhook")
