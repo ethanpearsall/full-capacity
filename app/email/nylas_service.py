@@ -144,11 +144,8 @@ async def fetch_message(grant_id: str, message_id: str) -> dict:
 
 async def download_attachment(grant_id: str, message_id: str, attachment_id: str) -> bytes:
     """Download an attachment's content from Nylas API."""
-    import urllib.parse
-
     base = settings.NYLAS_API_URI.rstrip("/")
-    encoded_attachment_id = urllib.parse.quote(attachment_id, safe="")
-    url = f"{base}/v3/grants/{grant_id}/messages/{message_id}/attachments/{encoded_attachment_id}/download"
+    url = f"{base}/v3/grants/{grant_id}/messages/{message_id}/attachments/{attachment_id}/download"
 
     logger.info("Nylas attachment download URL: %s", url)
 
