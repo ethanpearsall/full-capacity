@@ -257,9 +257,24 @@ def _synthesise_response(question: str, documents: list[dict]) -> str:
         logger.exception("Response synthesis failed")
         claude_response = _fallback_format(documents)
 
+    # Strip any markdown that Claude included despite the prompt instruction
+    claude_response = _strip_markdown(claude_response)
+
     # Append clickable document reference links
     claude_response += _build_document_links(documents)
     return claude_response
+
+
+def _strip_markdown(text: str) -> str:
+    """Remove markdown formatting from Claude response."""
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)  # **bold**
+    text = re.sub(r'\*(.+?)\*', r'\1', text)       # *italic*
+    text = re.sub(r'__(.+?)__', r'\1', text)       # __bold__
+    text = re.sub(r'_(.+?)_', r'\1', text)         # _italic_
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)  # # headers
+    text = re.sub(r'^\* ', '- ', text, flags=re.MULTILINE)      # * bullets to - dashes
+    text = re.sub(r'^• ', '- ', text, flags=re.MULTILINE)       # • bullets to - dashes
+    return text
 
 
 def _build_document_links(documents: list[dict]) -> str:
