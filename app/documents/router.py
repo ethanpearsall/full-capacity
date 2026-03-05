@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, date
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, Request
 
 from app.auth.dependencies import get_current_user
 from app.database import get_supabase_admin
