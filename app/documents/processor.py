@@ -12,9 +12,11 @@ def extract_text(file_bytes: bytes, mime_type: str) -> str:
     Supports PDFs (text-based and scanned), images, and Word documents.
     """
     try:
-        if mime_type == "application/pdf":
+        # Strip MIME parameters (e.g. 'application/pdf; name="file.pdf"' -> 'application/pdf')
+        base_mime = mime_type.split(";")[0].strip().lower() if mime_type else ""
+        if base_mime == "application/pdf":
             return _extract_from_pdf(file_bytes)
-        elif mime_type in (
+        elif base_mime in (
             "image/jpeg",
             "image/png",
             "image/tiff",
@@ -22,7 +24,7 @@ def extract_text(file_bytes: bytes, mime_type: str) -> str:
             "image/gif",
         ):
             return _extract_from_image(file_bytes)
-        elif mime_type in (
+        elif base_mime in (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/msword",
         ):
