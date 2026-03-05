@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Client Matters — Full Capacity{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-lg font-semibold text-neutral-950">Client Matters</h1>
+        <p class="text-xs text-neutral-400 mt-0.5">Organise documents by client and matter</p>
+    </div>
+    <button onclick="openNewMatterModal()" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors inline-flex items-center gap-2">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        New Matter
+    </button>
+</div>
+
+<!-- Status filter -->
+<div class="flex gap-2 mb-4">
+    <button onclick="filterMatters('active')" id="filter-active" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-neutral-950 text-white">Active</button>
+    <button onclick="filterMatters('archived')" id="filter-archived" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-neutral-100 text-neutral-600 hover:bg-neutral-200">Archived</button>
+    <button onclick="filterMatters('all')" id="filter-all" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-neutral-100 text-neutral-600 hover:bg-neutral-200">All</button>
+</div>
+
+<!-- Matters grid -->
+<div id="matters-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="col-span-full text-center py-12">
+        <div class="luma-spinner text-neutral-300 mx-auto" style="width:40px;"><span></span><span></span></div>
+        <p class="text-neutral-400 text-sm mt-4">Loading matters...</p>
+    </div>
+</div>
+
+<!-- Empty state -->
+<div id="matters-empty" class="hidden text-center py-16">
+    <i data-lucide="briefcase" class="w-16 h-16 text-neutral-300 mx-auto mb-3"></i>
+    <p class="text-neutral-500 text-sm font-medium mb-1">No client matters yet</p>
+    <p class="text-neutral-400 text-xs mb-4">Create your first client matter to start organising documents.</p>
+    <button onclick="openNewMatterModal()" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors">Create Matter</button>
+</div>
+
+<!-- New Matter Modal -->
+<div id="new-matter-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeNewMatterModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-neutral-950 mb-4">New Client Matter</h3>
+        <form onsubmit="createMatter(event)">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Client Name *</label>
+                    <input type="text" id="matter-client" required class="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-950 focus:border-transparent" placeholder="e.g. Smith & Co">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Matter Name</label>
+                    <input type="text" id="matter-name" class="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-950 focus:border-transparent" placeholder="e.g. Property Purchase">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1.5">Reference</label>
+                    <input type="text" id="matter-ref" class="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-950 focus:border-transparent" placeholder="e.g. 2026-001">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="closeNewMatterModal()" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                <button type="submit" id="create-matter-btn" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Matter Detail Panel (slides in) -->
+<div id="matter-detail-panel" class="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-xl z-50 hidden transform translate-x-full transition-transform duration-300">
+    <div class="h-full flex flex-col">
+        <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-neutral-950" id="detail-title"></h3>
+            <button onclick="closeMatterDetail()" class="text-neutral-400 hover:text-neutral-700 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div class="mb-4">
+                <p class="text-xs text-neutral-400 uppercase tracking-wide mb-1">Reference</p>
+                <p class="text-sm text-neutral-700" id="detail-ref">--</p>
+            </div>
+            <div class="mb-4">
+                <p class="text-xs text-neutral-400 uppercase tracking-wide mb-1">Status</p>
+                <p class="text-sm" id="detail-status"></p>
+            </div>
+            <div class="mb-6">
+                <p class="text-xs text-neutral-400 uppercase tracking-wide mb-2">Documents</p>
+                <div id="detail-docs" class="space-y-2"></div>
+                <div id="detail-docs-empty" class="hidden text-center py-6">
+                    <p class="text-neutral-400 text-xs">No documents filed under this matter yet.</p>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-neutral-100 flex gap-2">
+            <button onclick="archiveCurrentMatter()" id="detail-archive-btn" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Archive</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Client Matters';
+    setActiveNav('nav-matters');
+    loadMatters();
+});
+
+let currentFilter = 'active';
+let currentMatterId = null;
+
+function filterMatters(status) {
+    currentFilter = status;
+    document.querySelectorAll('[id^="filter-"]').forEach(btn => {
+        btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-neutral-100 text-neutral-600 hover:bg-neutral-200';
+    });
+    document.getElementById('filter-' + status).className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-neutral-950 text-white';
+    loadMatters();
+}
+
+async function loadMatters() {
+    try {
+        const res = await fetch('/api/matters?status=' + currentFilter);
+        if (!res.ok) return;
+        const data = await res.json();
+        renderMatters(data.matters || []);
+    } catch (err) {
+        console.error('Failed to load matters:', err);
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function renderMatters(matters) {
+    const grid = document.getElementById('matters-grid');
+    const empty = document.getElementById('matters-empty');
+
+    if (matters.length === 0) {
+        grid.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+    }
+
+    grid.classList.remove('hidden');
+    empty.classList.add('hidden');
+
+    grid.innerHTML = matters.map(function(m) {
+        const statusCls = m.status === 'active' ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-500';
+        const docCount = m.document_count || 0;
+        const updated = m.updated_at ? new Date(m.updated_at).toLocaleDateString() : '';
+
+        return '<div class="bg-white border border-neutral-200 rounded-xl p-5 card-hover cursor-pointer transition-all" onclick="openMatterDetail(\'' + m.id + '\')">' +
+            '<div class="flex items-start justify-between mb-3">' +
+                '<div class="min-w-0 flex-1">' +
+                    '<h3 class="text-sm font-semibold text-neutral-950 truncate">' + escapeHtml(m.client_name) + '</h3>' +
+                    (m.matter_name ? '<p class="text-xs text-neutral-500 truncate mt-0.5">' + escapeHtml(m.matter_name) + '</p>' : '') +
+                '</div>' +
+                '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium ' + statusCls + ' ml-2 flex-shrink-0">' + m.status + '</span>' +
+            '</div>' +
+            '<div class="flex items-center gap-4 text-[11px] text-neutral-400">' +
+                (m.matter_reference ? '<span>Ref: ' + escapeHtml(m.matter_reference) + '</span>' : '') +
+                '<span>' + docCount + ' doc' + (docCount !== 1 ? 's' : '') + '</span>' +
+                (updated ? '<span>Updated ' + updated + '</span>' : '') +
+            '</div>' +
+        '</div>';
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function openNewMatterModal() {
+    document.getElementById('new-matter-modal').classList.remove('hidden');
+}
+
+function closeNewMatterModal() {
+    document.getElementById('new-matter-modal').classList.add('hidden');
+    document.getElementById('matter-client').value = '';
+    document.getElementById('matter-name').value = '';
+    document.getElementById('matter-ref').value = '';
+}
+
+async function createMatter(e) {
+    e.preventDefault();
+    const btn = document.getElementById('create-matter-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    try {
+        const res = await fetch('/api/matters', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                client_name: document.getElementById('matter-client').value,
+                matter_name: document.getElementById('matter-name').value || null,
+                matter_reference: document.getElementById('matter-ref').value || null,
+            }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        closeNewMatterModal();
+        loadMatters();
+    } catch (err) {
+        console.error('Failed to create matter:', err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create';
+    }
+}
+
+async function openMatterDetail(matterId) {
+    currentMatterId = matterId;
+    const panel = document.getElementById('matter-detail-panel');
+    panel.classList.remove('hidden');
+    setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+
+    try {
+        const res = await fetch('/api/matters/' + matterId);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById('detail-title').textContent = data.client_name + (data.matter_name ? ' / ' + data.matter_name : '');
+        document.getElementById('detail-ref').textContent = data.matter_reference || '--';
+        document.getElementById('detail-status').textContent = data.status;
+        document.getElementById('detail-status').className = 'text-sm ' + (data.status === 'active' ? 'text-neutral-950 font-medium' : 'text-neutral-400');
+
+        const docs = data.documents || [];
+        const docsEl = document.getElementById('detail-docs');
+        const docsEmpty = document.getElementById('detail-docs-empty');
+
+        if (docs.length === 0) {
+            docsEl.classList.add('hidden');
+            docsEmpty.classList.remove('hidden');
+        } else {
+            docsEl.classList.remove('hidden');
+            docsEmpty.classList.add('hidden');
+            docsEl.innerHTML = docs.map(function(d) {
+                return '<a href="/document/' + d.id + '" class="flex items-center gap-3 p-3 rounded-lg border border-neutral-100 hover:bg-neutral-50 transition-colors">' +
+                    '<i data-lucide="file-text" class="w-4 h-4 text-neutral-400 flex-shrink-0"></i>' +
+                    '<div class="min-w-0">' +
+                        '<p class="text-sm text-neutral-700 truncate">' + escapeHtml(d.original_filename || d.title || 'Untitled') + '</p>' +
+                        '<p class="text-[10px] text-neutral-400">' + escapeHtml(d.document_type || '') + '</p>' +
+                    '</div>' +
+                '</a>';
+            }).join('');
+        }
+
+        const archiveBtn = document.getElementById('detail-archive-btn');
+        archiveBtn.textContent = data.status === 'active' ? 'Archive' : 'Reactivate';
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    } catch (err) {
+        console.error('Failed to load matter detail:', err);
+    }
+}
+
+function closeMatterDetail() {
+    const panel = document.getElementById('matter-detail-panel');
+    panel.classList.add('translate-x-full');
+    setTimeout(() => panel.classList.add('hidden'), 300);
+    currentMatterId = null;
+}
+
+async function archiveCurrentMatter() {
+    if (!currentMatterId) return;
+    const btn = document.getElementById('detail-archive-btn');
+    const newStatus = btn.textContent === 'Archive' ? 'archived' : 'active';
+
+    try {
+        await fetch('/api/matters/' + currentMatterId, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: newStatus}),
+        });
+        closeMatterDetail();
+        loadMatters();
+    } catch (err) {
+        console.error('Failed to update matter:', err);
+    }
+}
+</script>
+{% endblock %}

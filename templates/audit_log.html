@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Activity Log — Full Capacity{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-lg font-semibold text-neutral-950">Activity Log</h1>
+        <p class="text-xs text-neutral-400 mt-0.5">Full audit trail of all actions</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="flex flex-wrap gap-2 mb-4">
+    <select id="filter-entity" onchange="loadAuditLog()" class="border border-neutral-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-neutral-950">
+        <option value="">All types</option>
+        <option value="document">Documents</option>
+        <option value="email">Email</option>
+        <option value="matter">Matters</option>
+        <option value="todo">Tasks</option>
+        <option value="summary">Summaries</option>
+        <option value="user">Users</option>
+    </select>
+</div>
+
+<!-- Log table -->
+<div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-neutral-50">
+                <tr>
+                    <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Time</th>
+                    <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left">Action</th>
+                    <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden md:table-cell">Details</th>
+                    <th class="px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider text-left hidden lg:table-cell">IP</th>
+                </tr>
+            </thead>
+            <tbody id="audit-table">
+                <tr>
+                    <td colspan="4" class="px-6 py-12 text-center">
+                        <div class="luma-spinner text-neutral-300 mx-auto" style="width:40px;"><span></span><span></span></div>
+                        <p class="text-neutral-400 text-sm mt-4">Loading activity...</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 border-t border-neutral-100 flex items-center justify-between">
+        <span class="text-xs text-neutral-500" id="audit-count"></span>
+        <div class="flex gap-2">
+            <button onclick="prevAuditPage()" id="audit-prev" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Prev</button>
+            <button onclick="nextAuditPage()" id="audit-next" class="bg-neutral-100 hover:bg-neutral-200 rounded-lg px-3 py-1.5 text-xs text-neutral-600 transition-colors hidden">Next</button>
+        </div>
+    </div>
+</div>
+
+<!-- Empty state -->
+<div id="audit-empty" class="hidden text-center py-16">
+    <i data-lucide="scroll-text" class="w-16 h-16 text-neutral-300 mx-auto mb-3"></i>
+    <p class="text-neutral-500 text-sm font-medium">No activity recorded yet</p>
+    <p class="text-neutral-400 text-xs mt-1">Actions will appear here as they happen.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const email = '{{ user.get("email", "") }}';
+    const orgName = '{{ user.get("organisations", {}).get("name", "") if user.get("organisations") is mapping else "" }}';
+    document.getElementById('sidebar-user-name').textContent = email;
+    document.getElementById('sidebar-user-name').dataset.email = email;
+    document.getElementById('sidebar-org-name').textContent = orgName;
+    document.getElementById('user-avatar').textContent = email ? email.charAt(0).toUpperCase() : '';
+    const topAvatar = document.getElementById('topbar-avatar');
+    if (topAvatar) topAvatar.textContent = email ? email.charAt(0).toUpperCase() : '';
+    document.getElementById('page-title').textContent = 'Activity Log';
+    setActiveNav('nav-audit');
+    loadAuditLog();
+});
+
+const ACTION_LABELS = {
+    "document.uploaded": "uploaded a document",
+    "document.classified": "AI classified document",
+    "document.viewed": "viewed a document",
+    "document.downloaded": "downloaded a document",
+    "document.assigned_matter": "assigned document to matter",
+    "document.force_filed": "force-filed a duplicate",
+    "email.connected": "connected email",
+    "email.ingested": "email received",
+    "email.attachment_processed": "attachment filed",
+    "matter.created": "created a matter",
+    "matter.updated": "updated a matter",
+    "matter.archived": "archived a matter",
+    "todo.completed": "completed a task",
+    "todo.created": "created a task",
+    "user.logged_in": "logged in",
+    "user.logged_out": "logged out",
+    "summary.generated": "summary generated",
+    "summary.refreshed": "summary refreshed",
+    "chatbot.query": "chatbot query",
+};
+
+let auditPage = 0;
+const AUDIT_PAGE_SIZE = 50;
+
+async function loadAuditLog() {
+    const entityType = document.getElementById('filter-entity').value;
+    let url = '/api/audit/log?limit=' + AUDIT_PAGE_SIZE + '&offset=' + (auditPage * AUDIT_PAGE_SIZE);
+    if (entityType) url += '&entity_type=' + entityType;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        renderAuditLog(data.entries || []);
+    } catch (err) {
+        console.error('Failed to load audit log:', err);
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return then.toLocaleDateString();
+}
+
+function renderAuditLog(entries) {
+    const tbody = document.getElementById('audit-table');
+    const empty = document.getElementById('audit-empty');
+    const count = document.getElementById('audit-count');
+
+    if (entries.length === 0 && auditPage === 0) {
+        tbody.closest('.bg-white').classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+    }
+
+    tbody.closest('.bg-white').classList.remove('hidden');
+    empty.classList.add('hidden');
+    count.textContent = entries.length > 0 ? 'Showing ' + entries.length + ' entries' : '';
+
+    document.getElementById('audit-prev').classList.toggle('hidden', auditPage === 0);
+    document.getElementById('audit-next').classList.toggle('hidden', entries.length < AUDIT_PAGE_SIZE);
+
+    tbody.innerHTML = entries.map(function(e) {
+        const label = ACTION_LABELS[e.action] || e.action;
+        const details = e.details || {};
+        let detailStr = '';
+        if (details.filename) detailStr = details.filename;
+        else if (details.client_name) detailStr = details.client_name;
+        else if (details.email) detailStr = details.email;
+        else if (details.task) detailStr = details.task;
+        else if (details.query) detailStr = details.query;
+
+        const fullTime = e.created_at ? new Date(e.created_at).toLocaleString() : '';
+
+        return '<tr class="border-b border-neutral-100 hover:bg-neutral-50 transition-colors">' +
+            '<td class="px-6 py-3"><span class="text-xs text-neutral-500" title="' + escapeHtml(fullTime) + '">' + timeAgo(e.created_at) + '</span></td>' +
+            '<td class="px-6 py-3">' +
+                '<span class="text-sm text-neutral-700">' + escapeHtml(label) + '</span>' +
+                '<span class="text-[10px] text-neutral-400 ml-2">' + escapeHtml(e.entity_type) + '</span>' +
+            '</td>' +
+            '<td class="px-6 py-3 hidden md:table-cell"><span class="text-xs text-neutral-500 truncate max-w-[200px] block">' + escapeHtml(detailStr) + '</span></td>' +
+            '<td class="px-6 py-3 hidden lg:table-cell"><span class="text-[10px] text-neutral-400 font-mono">' + escapeHtml(e.ip_address || '') + '</span></td>' +
+        '</tr>';
+    }).join('');
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function prevAuditPage() { if (auditPage > 0) { auditPage--; loadAuditLog(); } }
+function nextAuditPage() { auditPage++; loadAuditLog(); }
+</script>
+{% endblock %}

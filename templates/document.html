@@ -107,6 +107,37 @@
             </dl>
         </div>
 
+        <!-- Client Matter -->
+        <div id="doc-matter-section" class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="briefcase" class="w-4 h-4 text-neutral-400"></i>
+                    <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Client Matter</h3>
+                </div>
+                <button onclick="openAssignMatter()" id="assign-matter-btn" class="text-xs text-neutral-500 hover:text-neutral-950 transition-colors">Assign</button>
+            </div>
+            <div id="doc-matter-info">
+                <p id="doc-matter-name" class="text-sm font-medium text-neutral-950"></p>
+                <p id="doc-matter-ref" class="text-xs text-neutral-400 mt-0.5"></p>
+            </div>
+            <p id="doc-matter-none" class="text-sm text-neutral-400 hidden">Not assigned to a matter</p>
+
+            <!-- Assign matter dropdown (hidden by default) -->
+            <div id="assign-matter-dropdown" class="hidden mt-3 border border-neutral-200 rounded-lg overflow-hidden">
+                <div id="matter-options" class="max-h-48 overflow-y-auto divide-y divide-neutral-100"></div>
+            </div>
+        </div>
+
+        <!-- Document Activity -->
+        <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="scroll-text" class="w-4 h-4 text-neutral-400"></i>
+                <h3 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Activity</h3>
+            </div>
+            <div id="doc-activity" class="space-y-2"></div>
+            <p id="doc-activity-empty" class="text-sm text-neutral-400 hidden">No activity recorded.</p>
+        </div>
+
         <!-- AI Summary -->
         <div class="bg-white border border-neutral-200 rounded-xl p-5 mb-6 card-hover">
             <div class="flex items-center gap-2 mb-3">
@@ -169,7 +200,7 @@ async function loadDocument() {
     }
 }
 
-function renderDocument(doc) {
+async function renderDocument(doc) {
     document.getElementById('doc-loading').classList.add('hidden');
     document.getElementById('doc-content').classList.remove('hidden');
 
@@ -248,7 +279,110 @@ function renderDocument(doc) {
         }
     }
 
+    // Client matter
+    if (doc.client_matter_id) {
+        document.getElementById('doc-matter-none').classList.add('hidden');
+        document.getElementById('doc-matter-info').classList.remove('hidden');
+        // Load matter details
+        try {
+            const mRes = await fetch('/api/matters/' + doc.client_matter_id);
+            if (mRes.ok) {
+                const m = await mRes.json();
+                document.getElementById('doc-matter-name').textContent = m.client_name + (m.matter_name ? ' / ' + m.matter_name : '');
+                document.getElementById('doc-matter-ref').textContent = m.matter_reference ? 'Ref: ' + m.matter_reference : '';
+            }
+        } catch (e) {}
+    } else {
+        document.getElementById('doc-matter-info').classList.add('hidden');
+        document.getElementById('doc-matter-none').classList.remove('hidden');
+    }
+
+    // Document activity trail
+    try {
+        const actRes = await fetch('/api/audit/log/entity/document/' + doc.id);
+        if (actRes.ok) {
+            const actData = await actRes.json();
+            const entries = actData.entries || [];
+            const actEl = document.getElementById('doc-activity');
+            const actEmpty = document.getElementById('doc-activity-empty');
+            if (entries.length === 0) {
+                actEmpty.classList.remove('hidden');
+            } else {
+                actEmpty.classList.add('hidden');
+                const labels = {
+                    "document.uploaded": "Uploaded",
+                    "document.classified": "AI classified",
+                    "document.viewed": "Viewed",
+                    "document.downloaded": "Downloaded",
+                    "document.assigned_matter": "Assigned to matter",
+                    "document.force_filed": "Force-filed",
+                };
+                actEl.innerHTML = entries.slice(0, 20).map(function(e) {
+                    const label = labels[e.action] || e.action;
+                    const time = e.created_at ? new Date(e.created_at).toLocaleString() : '';
+                    return '<div class="flex items-center justify-between py-1.5">' +
+                        '<span class="text-xs text-neutral-700">' + escapeHtml(label) + '</span>' +
+                        '<span class="text-[10px] text-neutral-400">' + time + '</span>' +
+                    '</div>';
+                }).join('');
+            }
+        }
+    } catch (e) {}
+
     lucide.createIcons();
+}
+
+// Matter assignment
+async function openAssignMatter() {
+    const dropdown = document.getElementById('assign-matter-dropdown');
+    const options = document.getElementById('matter-options');
+
+    if (!dropdown.classList.contains('hidden')) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+
+    options.innerHTML = '<div class="px-3 py-2 text-xs text-neutral-400">Loading...</div>';
+    dropdown.classList.remove('hidden');
+
+    try {
+        const res = await fetch('/api/matters');
+        if (!res.ok) return;
+        const data = await res.json();
+        const matters = data.matters || [];
+
+        if (matters.length === 0) {
+            options.innerHTML = '<div class="px-3 py-3 text-xs text-neutral-400">No matters created yet. <a href="/api/matters/page" class="text-neutral-950 hover:underline">Create one</a></div>';
+            return;
+        }
+
+        // Add "None" option to unassign
+        let html = '<button onclick="assignMatter(null)" class="w-full text-left px-3 py-2 text-xs text-neutral-400 hover:bg-neutral-50 transition-colors">None (unassign)</button>';
+        html += matters.map(function(m) {
+            return '<button onclick="assignMatter(\'' + m.id + '\')" class="w-full text-left px-3 py-2 hover:bg-neutral-50 transition-colors">' +
+                '<p class="text-xs font-medium text-neutral-700">' + escapeHtml(m.client_name) + (m.matter_name ? ' / ' + escapeHtml(m.matter_name) : '') + '</p>' +
+                (m.matter_reference ? '<p class="text-[10px] text-neutral-400">' + escapeHtml(m.matter_reference) + '</p>' : '') +
+            '</button>';
+        }).join('');
+        options.innerHTML = html;
+    } catch (e) {
+        options.innerHTML = '<div class="px-3 py-2 text-xs text-red-500">Failed to load matters</div>';
+    }
+}
+
+async function assignMatter(matterId) {
+    document.getElementById('assign-matter-dropdown').classList.add('hidden');
+
+    try {
+        await fetch('/api/documents/' + docId + '/assign-matter', {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({matter_id: matterId}),
+        });
+        loadDocument();
+    } catch (e) {
+        console.error('Failed to assign matter:', e);
+    }
 }
 
 async function reclassifyDocument() {

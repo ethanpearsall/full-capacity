@@ -123,6 +123,13 @@ async def _process_single_file(
     # Log activity
     _log_activity(sb, org_id, user_id, doc_id, "uploaded", {"filename": original_filename})
 
+    # Audit trail (fire-and-forget import to avoid circular deps at module level)
+    import asyncio
+    from app.audit import log_action
+    asyncio.ensure_future(log_action(org_id, user_id, "document.uploaded", "document", doc_id, {
+        "filename": original_filename, "file_size": file_size, "source": "upload",
+    }))
+
     return _run_processing_pipeline(sb, doc_id, org_id, user_id, org_name, file_bytes, mime_type, original_filename, original_storage_path)
 
 
@@ -225,6 +232,7 @@ async def list_documents(
     status: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    client_matter_id: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -248,6 +256,8 @@ async def list_documents(
         query = query.gte("document_date", date_from)
     if date_to:
         query = query.lte("document_date", date_to)
+    if client_matter_id:
+        query = query.eq("client_matter_id", client_matter_id)
 
     result = query.execute()
     return {"documents": result.data, "count": len(result.data)}
@@ -358,6 +368,14 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
     file_bytes = download_file(storage_path)
 
     _log_activity(sb, user["organisation_id"], user["id"], doc_id, "downloaded", {})
+
+    import asyncio
+    from app.audit import log_action
+    asyncio.ensure_future(log_action(
+        user["organisation_id"], user["id"],
+        "document.downloaded", "document", doc_id,
+        {"filename": result.data["original_filename"]},
+    ))
 
     return StreamingResponse(
         io.BytesIO(file_bytes),
@@ -578,6 +596,41 @@ async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
     sb.table("documents").delete().eq("id", doc_id).eq("organisation_id", org_id).execute()
     _log_activity(sb, org_id, user["id"], doc_id, "deleted", {})
     return {"id": doc_id, "status": "deleted"}
+
+
+@router.patch("/{doc_id}/assign-matter")
+async def assign_document_to_matter(
+    doc_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Assign a document to a client matter."""
+    body = await request.json()
+    sb = get_supabase_admin()
+    org_id = user["organisation_id"]
+
+    existing = (
+        sb.table("documents")
+        .select("id")
+        .eq("id", doc_id)
+        .eq("organisation_id", org_id)
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    matter_id = body.get("matter_id")
+    sb.table("documents").update({
+        "client_matter_id": matter_id,
+    }).eq("id", doc_id).execute()
+
+    from app.audit import log_action
+    await log_action(org_id, user["id"], "document.assigned_matter", "document", doc_id, {
+        "matter_id": matter_id,
+    }, request=request)
+
+    return {"status": "ok"}
 
 
 def _log_activity(

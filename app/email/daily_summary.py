@@ -1,4 +1,10 @@
-"""Daily email summary and to-do list generator."""
+"""Daily email summary and to-do list generator.
+
+Generates per-user morning summaries by collecting the user's emails
+from the last 24 hours, using Claude AI to summarise each email and
+extract prioritised action items.  Action items are persisted to the
+``user_todos`` table for proper per-user tracking.
+"""
 
 import json
 import logging
@@ -18,43 +24,33 @@ MODEL = "claude-sonnet-4-20250514"
 MAX_EMAILS_FOR_SUMMARY = 50
 
 
-async def generate_daily_summary(org_id: str) -> dict:
-    """Generate a morning summary of all emails received in the last 24 hours.
+async def generate_daily_summary(org_id: str, user_id: Optional[str] = None) -> dict:
+    """Generate a morning summary of emails received in the last 24 hours.
 
-    Returns a dict with email summaries, a prioritised to-do list, and stats.
+    When *user_id* is provided the summary is scoped to that user's
+    emails only (per-user PA).  Falls back to org-wide if no user_id.
     """
     sb = get_supabase_admin()
 
     since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
 
-    result = (
+    query = (
         sb.table("email_ingestions")
         .select("*")
         .eq("organisation_id", org_id)
         .gte("received_at", since)
         .order("received_at", desc=True)
         .limit(MAX_EMAILS_FOR_SUMMARY)
-        .execute()
     )
 
+    if user_id:
+        query = query.eq("user_id", user_id)
+
+    result = query.execute()
     emails = result.data or []
 
     if not emails:
-        return {
-            "summary_date": datetime.utcnow().strftime("%Y-%m-%d"),
-            "email_count": 0,
-            "emails": [],
-            "todo_list": [],
-            "stats": {
-                "total_emails": 0,
-                "with_attachments": 0,
-                "documents_filed": 0,
-                "action_items_found": 0,
-                "high_priority": 0,
-                "medium_priority": 0,
-                "low_priority": 0,
-            },
-        }
+        return _empty_summary()
 
     # Enrich each email with attachment/document info
     email_data = []
@@ -99,6 +95,24 @@ async def generate_daily_summary(org_id: str) -> dict:
 
     summary_result = await _ai_summarise_emails(email_data)
     return summary_result
+
+
+def _empty_summary() -> dict:
+    return {
+        "summary_date": datetime.utcnow().strftime("%Y-%m-%d"),
+        "email_count": 0,
+        "emails": [],
+        "todo_list": [],
+        "stats": {
+            "total_emails": 0,
+            "with_attachments": 0,
+            "documents_filed": 0,
+            "action_items_found": 0,
+            "high_priority": 0,
+            "medium_priority": 0,
+            "low_priority": 0,
+        },
+    }
 
 
 async def _ai_summarise_emails(email_data: list) -> dict:
@@ -225,8 +239,10 @@ def _parse_json_response(response_text: str) -> Optional[dict]:
     return None
 
 
-async def save_daily_summary(org_id: str, user_id: str, summary: dict) -> str:
-    """Save the daily summary to the database."""
+async def save_daily_summary(
+    org_id: str, user_id: str, summary: dict
+) -> str:
+    """Save the daily summary and persist to-do items to user_todos."""
     sb = get_supabase_admin()
 
     summary_id = str(uuid.uuid4())
@@ -236,11 +252,31 @@ async def save_daily_summary(org_id: str, user_id: str, summary: dict) -> str:
             "id": summary_id,
             "organisation_id": org_id,
             "generated_by": user_id,
+            "user_id": user_id,
             "summary_date": summary["summary_date"],
             "email_count": summary["email_count"],
             "todo_count": len(summary.get("todo_list", [])),
             "summary_data": summary,
         }
     ).execute()
+
+    # Persist action items to user_todos table
+    for item in summary.get("todo_list", []):
+        try:
+            sb.table("user_todos").insert(
+                {
+                    "id": str(uuid.uuid4()),
+                    "user_id": user_id,
+                    "organisation_id": org_id,
+                    "summary_id": summary_id,
+                    "task": item.get("task", ""),
+                    "source_email_subject": item.get("source_email"),
+                    "source_email_from": item.get("from"),
+                    "priority": item.get("priority", "medium"),
+                    "due_hint": item.get("due_hint"),
+                }
+            ).execute()
+        except Exception as e:
+            logger.error("Failed to create user_todo: %s", e)
 
     return summary_id

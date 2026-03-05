@@ -12,6 +12,8 @@ from app.documents.router import router as documents_router
 from app.dashboard.router import router as dashboard_router
 from app.chat.router import router as chat_router
 from app.email.router import router as email_router
+from app.matters.router import router as matters_router
+from app.audit_router import router as audit_router
 from app.database import get_supabase_admin
 from app.config import settings
 
@@ -77,6 +79,8 @@ app.include_router(documents_router)
 app.include_router(dashboard_router)
 app.include_router(chat_router)
 app.include_router(email_router)
+app.include_router(matters_router)
+app.include_router(audit_router)
 
 
 @app.get("/health")

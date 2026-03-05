@@ -57,6 +57,29 @@
         </div>
     </div>
 
+    <!-- Connect email prompt (shown when user hasn't connected) -->
+    <div id="connect-email-card" class="hidden bg-white border border-neutral-200 rounded-xl p-6">
+        <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                <i data-lucide="mail-plus" class="w-5 h-5 text-neutral-400"></i>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-neutral-950 mb-1">Connect Your Email</h3>
+                <p class="text-xs text-neutral-500 mb-4">Link your inbox to get a personalised morning summary with AI-extracted action items.</p>
+                <div class="flex gap-2">
+                    <a href="/api/email/nylas/connect?provider=google" class="bg-neutral-950 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-neutral-800 transition-colors inline-flex items-center gap-2">
+                        <i data-lucide="mail" class="w-3 h-3"></i>
+                        Google
+                    </a>
+                    <a href="/api/email/nylas/connect?provider=microsoft" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-4 py-2 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-2">
+                        <i data-lucide="mail" class="w-3 h-3"></i>
+                        Microsoft
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Error state -->
     <div id="summary-error" class="hidden bg-white border border-red-200 rounded-xl p-6">
         <div class="flex items-center gap-3">
@@ -71,28 +94,17 @@
 </div>
 
 <script>
-const SUMMARY_TODO_KEY = 'fc_summary_todos_completed';
+// Track completed state -- uses DB via PATCH, with localStorage fallback for IDs
+const _todoCompletedLocal = {};
 
-function getSummaryCompletedTodos() {
-    try {
-        return JSON.parse(localStorage.getItem(SUMMARY_TODO_KEY) || '{}');
-    } catch (e) { return {}; }
-}
+async function toggleSummaryTodo(id, dbId) {
+    const isCompleted = !_todoCompletedLocal[id];
+    _todoCompletedLocal[id] = isCompleted;
 
-function toggleSummaryTodo(id) {
-    const completed = getSummaryCompletedTodos();
-    if (completed[id]) {
-        delete completed[id];
-    } else {
-        completed[id] = true;
-    }
-    localStorage.setItem(SUMMARY_TODO_KEY, JSON.stringify(completed));
-
-    const row = document.getElementById('todo-' + id);
     const cb = document.getElementById('cb-' + id);
     const label = document.getElementById('label-' + id);
-    if (row) {
-        if (completed[id]) {
+    if (cb) {
+        if (isCompleted) {
             cb.classList.add('bg-neutral-900', 'border-neutral-900');
             cb.classList.remove('border-neutral-300');
             cb.innerHTML = '<svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
@@ -103,6 +115,17 @@ function toggleSummaryTodo(id) {
             cb.innerHTML = '';
             label.classList.remove('line-through', 'text-neutral-400');
         }
+    }
+
+    // Persist to DB if we have a DB id
+    if (dbId) {
+        try {
+            await fetch('/api/email/todos/' + dbId, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({completed: isCompleted}),
+            });
+        } catch (e) { /* silently fail */ }
     }
 }
 
@@ -123,7 +146,7 @@ function priorityBadge(priority) {
     return '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium ' + cls + '">' + escapeHtmlSummary(priority) + '</span>';
 }
 
-function renderSummary(data) {
+async function renderSummary(data) {
     const loading = document.getElementById('summary-loading');
     const content = document.getElementById('summary-content');
     const errorEl = document.getElementById('summary-error');
@@ -174,8 +197,28 @@ function renderSummary(data) {
         }).join('');
     }
 
-    // To-do list
-    const todos = data.todo_list || [];
+    // To-do list -- try loading from DB, fall back to summary data
+    let todos = data.todo_list || [];
+    let todoDbIds = {};
+    try {
+        const todosRes = await fetch('/api/email/todos');
+        if (todosRes.ok) {
+            const todosData = await todosRes.json();
+            if (todosData.todos && todosData.todos.length > 0) {
+                todos = todosData.todos.map(function(t) {
+                    return {
+                        task: t.task,
+                        source_email: t.source_email_subject,
+                        from: t.source_email_from,
+                        priority: t.priority,
+                        due_hint: t.due_hint,
+                        _db_id: t.id,
+                    };
+                });
+            }
+        }
+    } catch (e) { /* fall back to summary data */ }
+
     if (todos.length === 0) {
         todoCard.classList.add('hidden');
     } else {
@@ -183,26 +226,17 @@ function renderSummary(data) {
         todoEmpty.classList.add('hidden');
         todoCount.textContent = todos.length + ' item' + (todos.length !== 1 ? 's' : '');
 
-        const completed = getSummaryCompletedTodos();
-
         todoList.innerHTML = todos.map(function(todo, idx) {
             const id = 'st-' + idx;
-            const done = completed[id];
-            const cbChecked = done
-                ? 'bg-neutral-900 border-neutral-900'
-                : 'border-neutral-300';
-            const cbInner = done
-                ? '<svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>'
-                : '';
-            const labelCls = done ? 'line-through text-neutral-400' : 'text-neutral-950';
+            const dbId = todo._db_id || '';
             const dueHtml = todo.due_hint
                 ? '<span class="text-[10px] text-neutral-400 bg-neutral-50 px-1.5 py-0.5 rounded">Due: ' + escapeHtmlSummary(todo.due_hint) + '</span>'
                 : '';
 
             return '<div id="todo-' + id + '" class="px-6 py-3 flex items-start gap-3 hover:bg-neutral-50 transition-colors">' +
-                '<button onclick="toggleSummaryTodo(\'' + id + '\')" id="cb-' + id + '" class="mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ' + cbChecked + '">' + cbInner + '</button>' +
+                '<button onclick="toggleSummaryTodo(\'' + id + '\', \'' + dbId + '\')" id="cb-' + id + '" class="mt-0.5 w-4 h-4 rounded border border-neutral-300 flex-shrink-0 flex items-center justify-center transition-colors"></button>' +
                 '<div class="min-w-0 flex-1">' +
-                    '<p id="label-' + id + '" class="text-sm ' + labelCls + '">' + escapeHtmlSummary(todo.task) + '</p>' +
+                    '<p id="label-' + id + '" class="text-sm text-neutral-950">' + escapeHtmlSummary(todo.task) + '</p>' +
                     '<div class="flex items-center gap-2 mt-1">' +
                         '<span class="text-[10px] text-neutral-400">from: ' + escapeHtmlSummary(todo.source_email) + '</span>' +
                         priorityBadge(todo.priority) +
@@ -220,10 +254,28 @@ async function loadDailySummary() {
     const loading = document.getElementById('summary-loading');
     const content = document.getElementById('summary-content');
     const errorEl = document.getElementById('summary-error');
+    const connectCard = document.getElementById('connect-email-card');
+
+    // Check if user has connected email
+    try {
+        const statusRes = await fetch('/api/email/connection-status');
+        if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (!statusData.connected) {
+                loading.classList.add('hidden');
+                connectCard.classList.remove('hidden');
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                return;
+            }
+        }
+    } catch (e) {
+        // Ignore -- proceed to load summary
+    }
 
     loading.classList.remove('hidden');
     content.classList.add('hidden');
     errorEl.classList.add('hidden');
+    connectCard.classList.add('hidden');
 
     try {
         const res = await fetch('/api/email/daily-summary');

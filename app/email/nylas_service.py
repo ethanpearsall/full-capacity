@@ -44,21 +44,26 @@ INLINE_SKIP_PATTERNS = [
 MIN_FILE_SIZE_BYTES = 2048  # 2 KB
 
 
-def get_nylas_auth_url(provider: str, org_id: str, redirect_uri: str) -> str:
+def get_nylas_auth_url(
+    provider: str, org_id: str, redirect_uri: str, user_id: str = ""
+) -> str:
     """Build the Nylas OAuth authorization URL.
 
     Args:
         provider: 'google' or 'microsoft'
         org_id: Organisation ID to embed in state
         redirect_uri: Callback URL after OAuth completes
+        user_id: User ID to embed in state (for per-user grants)
     """
+    # Encode both org_id and user_id in state, separated by ':'
+    state_value = f"{org_id}:{user_id}" if user_id else org_id
     base = settings.NYLAS_API_URI.rstrip("/")
     params = {
         "client_id": settings.NYLAS_CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "provider": provider,
-        "state": org_id,
+        "state": state_value,
     }
     query = "&".join(f"{k}={_url_encode(v)}" for k, v in params.items())
     return f"{base}/v3/connect/auth?{query}"
@@ -250,6 +255,7 @@ async def process_nylas_message(
     message_id: str,
     org_id: str,
     connection_id: str,
+    user_id: Optional[str] = None,
 ) -> None:
     """Process a new email message received via Nylas webhook.
 
@@ -306,7 +312,7 @@ async def process_nylas_message(
 
     # Create ingestion record
     ingestion_id = str(uuid.uuid4())
-    sb.table("email_ingestions").insert({
+    ingestion_data = {
         "id": ingestion_id,
         "organisation_id": org_id,
         "message_id": internet_message_id or nylas_message_id,
@@ -324,7 +330,10 @@ async def process_nylas_message(
             "subject": subject,
             "nylas_message_id": nylas_message_id,
         },
-    }).execute()
+    }
+    if user_id:
+        ingestion_data["user_id"] = user_id
+    sb.table("email_ingestions").insert(ingestion_data).execute()
 
     # Filter and download attachments
     attachments_to_process = []
