@@ -824,6 +824,58 @@ async def add_filter(
     return {"status": "ok", "message": "Filter added"}
 
 
+# ---------------------------------------------------------------------------
+# Daily summary
+# ---------------------------------------------------------------------------
+
+@router.get("/daily-summary")
+async def get_daily_summary(current_user: dict = Depends(get_current_user)):
+    """Get today's morning email summary and to-do list."""
+    from app.email.daily_summary import generate_daily_summary, save_daily_summary
+
+    org_id = current_user["organisation_id"]
+    sb = get_supabase_admin()
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Return cached summary if one exists for today
+    existing = (
+        sb.table("daily_summaries")
+        .select("summary_data")
+        .eq("organisation_id", org_id)
+        .eq("summary_date", today)
+        .limit(1)
+        .execute()
+    )
+
+    if existing.data:
+        return existing.data[0]["summary_data"]
+
+    # Generate fresh summary
+    summary = await generate_daily_summary(org_id)
+    await save_daily_summary(org_id, current_user["id"], summary)
+    return summary
+
+
+@router.post("/daily-summary/refresh")
+async def refresh_daily_summary(current_user: dict = Depends(get_current_user)):
+    """Force regenerate today's summary."""
+    from app.email.daily_summary import generate_daily_summary, save_daily_summary
+
+    org_id = current_user["organisation_id"]
+    sb = get_supabase_admin()
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Delete existing
+    sb.table("daily_summaries").delete().eq(
+        "organisation_id", org_id
+    ).eq("summary_date", today).execute()
+
+    # Regenerate
+    summary = await generate_daily_summary(org_id)
+    await save_daily_summary(org_id, current_user["id"], summary)
+    return summary
+
+
 @router.delete("/filters/{filter_id}")
 async def remove_filter(
     filter_id: str,

@@ -1,0 +1,261 @@
+<!-- Morning Summary section — loaded via fetch from /api/email/daily-summary -->
+<div id="daily-summary-section" class="mb-6">
+    <!-- Loading skeleton -->
+    <div id="summary-loading" class="bg-white border border-neutral-200 rounded-xl p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="h-5 w-48 bg-neutral-100 rounded animate-pulse"></div>
+            <div class="h-8 w-24 bg-neutral-100 rounded animate-pulse"></div>
+        </div>
+        <div class="h-4 w-64 bg-neutral-100 rounded animate-pulse mb-4"></div>
+        <div class="space-y-3">
+            <div class="h-16 bg-neutral-50 rounded-lg animate-pulse"></div>
+            <div class="h-16 bg-neutral-50 rounded-lg animate-pulse"></div>
+            <div class="h-16 bg-neutral-50 rounded-lg animate-pulse"></div>
+        </div>
+    </div>
+
+    <!-- Summary content (hidden until loaded) -->
+    <div id="summary-content" class="hidden space-y-6">
+        <!-- Email summaries card -->
+        <div class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-neutral-950">Morning Summary</h2>
+                    <p class="text-xs text-neutral-400 mt-0.5" id="summary-stats-bar"></p>
+                </div>
+                <button onclick="refreshSummary()" id="summary-refresh-btn" class="border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5">
+                    <i data-lucide="refresh-cw" class="w-3 h-3" id="refresh-icon"></i>
+                    Refresh
+                </button>
+            </div>
+
+            <!-- Email list -->
+            <div id="summary-emails" class="divide-y divide-neutral-100">
+            </div>
+
+            <!-- Empty state -->
+            <div id="summary-empty" class="hidden px-6 py-12 text-center">
+                <i data-lucide="inbox" class="w-12 h-12 text-neutral-300 mx-auto mb-3"></i>
+                <p class="text-neutral-500 text-sm font-medium">No emails in the last 24 hours</p>
+                <p class="text-neutral-400 text-xs mt-1">Your morning summary will appear here when new emails arrive.</p>
+            </div>
+        </div>
+
+        <!-- To-do list card -->
+        <div id="todo-card" class="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-neutral-100">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-neutral-950">Action Items</h2>
+                    <span class="text-xs text-neutral-400" id="todo-count"></span>
+                </div>
+            </div>
+            <div id="todo-list" class="divide-y divide-neutral-100">
+            </div>
+            <div id="todo-empty" class="hidden px-6 py-8 text-center">
+                <p class="text-neutral-400 text-sm">No action items extracted from recent emails.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="summary-error" class="hidden bg-white border border-red-200 rounded-xl p-6">
+        <div class="flex items-center gap-3">
+            <i data-lucide="alert-circle" class="w-5 h-5 text-red-400"></i>
+            <div>
+                <p class="text-sm font-medium text-neutral-950">Could not load morning summary</p>
+                <p class="text-xs text-neutral-400 mt-0.5">Try refreshing or check back later.</p>
+            </div>
+            <button onclick="loadDailySummary()" class="ml-auto border border-neutral-300 text-neutral-700 hover:bg-neutral-50 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Retry</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const SUMMARY_TODO_KEY = 'fc_summary_todos_completed';
+
+function getSummaryCompletedTodos() {
+    try {
+        return JSON.parse(localStorage.getItem(SUMMARY_TODO_KEY) || '{}');
+    } catch (e) { return {}; }
+}
+
+function toggleSummaryTodo(id) {
+    const completed = getSummaryCompletedTodos();
+    if (completed[id]) {
+        delete completed[id];
+    } else {
+        completed[id] = true;
+    }
+    localStorage.setItem(SUMMARY_TODO_KEY, JSON.stringify(completed));
+
+    const row = document.getElementById('todo-' + id);
+    const cb = document.getElementById('cb-' + id);
+    const label = document.getElementById('label-' + id);
+    if (row) {
+        if (completed[id]) {
+            cb.classList.add('bg-neutral-900', 'border-neutral-900');
+            cb.classList.remove('border-neutral-300');
+            cb.innerHTML = '<svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+            label.classList.add('line-through', 'text-neutral-400');
+        } else {
+            cb.classList.remove('bg-neutral-900', 'border-neutral-900');
+            cb.classList.add('border-neutral-300');
+            cb.innerHTML = '';
+            label.classList.remove('line-through', 'text-neutral-400');
+        }
+    }
+}
+
+function escapeHtmlSummary(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function priorityBadge(priority) {
+    const map = {
+        high: 'bg-red-50 text-red-700 border border-red-200',
+        medium: 'bg-amber-50 text-amber-700 border border-amber-200',
+        low: 'bg-neutral-100 text-neutral-500',
+    };
+    const cls = map[priority] || map.low;
+    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium ' + cls + '">' + escapeHtmlSummary(priority) + '</span>';
+}
+
+function renderSummary(data) {
+    const loading = document.getElementById('summary-loading');
+    const content = document.getElementById('summary-content');
+    const errorEl = document.getElementById('summary-error');
+    const emailsEl = document.getElementById('summary-emails');
+    const emptyEl = document.getElementById('summary-empty');
+    const todoList = document.getElementById('todo-list');
+    const todoEmpty = document.getElementById('todo-empty');
+    const todoCard = document.getElementById('todo-card');
+    const todoCount = document.getElementById('todo-count');
+    const statsBar = document.getElementById('summary-stats-bar');
+
+    loading.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    content.classList.remove('hidden');
+
+    const stats = data.stats || {};
+    const parts = [];
+    if (stats.total_emails) parts.push(stats.total_emails + ' email' + (stats.total_emails !== 1 ? 's' : ''));
+    if (stats.with_attachments) parts.push(stats.with_attachments + ' with attachments');
+    if (stats.action_items_found) parts.push(stats.action_items_found + ' action item' + (stats.action_items_found !== 1 ? 's' : ''));
+    statsBar.textContent = parts.join('  |  ') || data.summary_date || '';
+
+    const emails = data.emails || [];
+    if (emails.length === 0) {
+        emailsEl.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+    } else {
+        emailsEl.classList.remove('hidden');
+        emptyEl.classList.add('hidden');
+
+        emailsEl.innerHTML = emails.map(function(em) {
+            const attHtml = em.attachment_count
+                ? '<span class="inline-flex items-center gap-1 text-[10px] text-neutral-400"><i data-lucide="paperclip" class="w-2.5 h-2.5"></i>' + em.attachment_count + '</span>'
+                : '';
+            return '<div class="px-6 py-4 hover:bg-neutral-50 transition-colors">' +
+                '<div class="flex items-start justify-between gap-4">' +
+                    '<div class="min-w-0 flex-1">' +
+                        '<div class="flex items-center gap-2 mb-1">' +
+                            '<span class="text-sm font-medium text-neutral-950 truncate">' + escapeHtmlSummary(em.from) + '</span>' +
+                            priorityBadge(em.priority) +
+                            attHtml +
+                        '</div>' +
+                        '<p class="text-xs font-medium text-neutral-700 mb-1 truncate">' + escapeHtmlSummary(em.subject) + '</p>' +
+                        '<p class="text-xs text-neutral-500 leading-relaxed">' + escapeHtmlSummary(em.summary) + '</p>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // To-do list
+    const todos = data.todo_list || [];
+    if (todos.length === 0) {
+        todoCard.classList.add('hidden');
+    } else {
+        todoCard.classList.remove('hidden');
+        todoEmpty.classList.add('hidden');
+        todoCount.textContent = todos.length + ' item' + (todos.length !== 1 ? 's' : '');
+
+        const completed = getSummaryCompletedTodos();
+
+        todoList.innerHTML = todos.map(function(todo, idx) {
+            const id = 'st-' + idx;
+            const done = completed[id];
+            const cbChecked = done
+                ? 'bg-neutral-900 border-neutral-900'
+                : 'border-neutral-300';
+            const cbInner = done
+                ? '<svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>'
+                : '';
+            const labelCls = done ? 'line-through text-neutral-400' : 'text-neutral-950';
+            const dueHtml = todo.due_hint
+                ? '<span class="text-[10px] text-neutral-400 bg-neutral-50 px-1.5 py-0.5 rounded">Due: ' + escapeHtmlSummary(todo.due_hint) + '</span>'
+                : '';
+
+            return '<div id="todo-' + id + '" class="px-6 py-3 flex items-start gap-3 hover:bg-neutral-50 transition-colors">' +
+                '<button onclick="toggleSummaryTodo(\'' + id + '\')" id="cb-' + id + '" class="mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ' + cbChecked + '">' + cbInner + '</button>' +
+                '<div class="min-w-0 flex-1">' +
+                    '<p id="label-' + id + '" class="text-sm ' + labelCls + '">' + escapeHtmlSummary(todo.task) + '</p>' +
+                    '<div class="flex items-center gap-2 mt-1">' +
+                        '<span class="text-[10px] text-neutral-400">from: ' + escapeHtmlSummary(todo.source_email) + '</span>' +
+                        priorityBadge(todo.priority) +
+                        dueHtml +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function loadDailySummary() {
+    const loading = document.getElementById('summary-loading');
+    const content = document.getElementById('summary-content');
+    const errorEl = document.getElementById('summary-error');
+
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    try {
+        const res = await fetch('/api/email/daily-summary');
+        if (!res.ok) throw new Error('Status ' + res.status);
+        const data = await res.json();
+        renderSummary(data);
+    } catch (err) {
+        console.error('Failed to load daily summary:', err);
+        loading.classList.add('hidden');
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function refreshSummary() {
+    const btn = document.getElementById('summary-refresh-btn');
+    const icon = document.getElementById('refresh-icon');
+    btn.disabled = true;
+    icon.style.animation = 'spin 1s linear infinite';
+
+    try {
+        const res = await fetch('/api/email/daily-summary/refresh', { method: 'POST' });
+        if (!res.ok) throw new Error('Status ' + res.status);
+        const data = await res.json();
+        renderSummary(data);
+    } catch (err) {
+        console.error('Failed to refresh summary:', err);
+    } finally {
+        btn.disabled = false;
+        icon.style.animation = '';
+    }
+}
+</script>
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
