@@ -127,7 +127,7 @@ async def get_matter(
         sb.table("documents")
         .select("*")
         .eq("client_matter_id", matter_id)
-        .order("created_at", desc=True)
+        .order("uploaded_at", desc=True)
         .execute()
     )
 
